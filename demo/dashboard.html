@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Test Race</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fog: #eef1f4;
+    --panel: #ffffff;
+    --ink: #17202b;
+    --muted: #5d6877;
+    --rule: #d6dce3;
+    --jev: #2e4bd8;
+    --pass: #2f8f5b;
+    --fail: #c8412b;
+    --wait: #d99a1e;
+    --idle: #9aa4b2;
+    --label-width: 270px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--fog);
+    color: var(--ink);
+    font-family: "Archivo", system-ui, sans-serif;
+    font-variation-settings: "wdth" 100;
+    overflow: hidden;
+  }
+
+  .frame { display: grid; grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; height: 100vh; padding: 20px 28px; }
+
+  .headline { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; }
+  .headline h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.01em; }
+  .headline p { margin: 0; color: var(--muted); font-size: 18px; }
+
+  .lane { display: grid; grid-template-rows: auto 1fr; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; min-height: 0; }
+  .lane-body { display: grid; grid-template-columns: 560px 1fr; min-height: 0; }
+  .browsers { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 6px; padding: 8px; background: #e3e8ee; min-height: 0; }
+  .browser { position: relative; background: #fff; border-radius: 4px; overflow: hidden; min-height: 0; display: grid; grid-template-rows: 20px 1fr; }
+  .browser .bar-top { display: flex; align-items: center; gap: 6px; padding: 0 8px; background: #f6f7f9; border-bottom: 1px solid var(--rule); font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+  .browser .bar-top::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--idle); flex: none; }
+  .browser.running .bar-top::before { background: var(--wait); }
+  .browser.stuck .bar-top::before { background: var(--fail); }
+  .browser img { width: 100%; height: 100%; object-fit: contain; object-position: top left; display: block; min-height: 0; }
+  .browser .stamp {
+    position: absolute; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 3px;
+    font-size: 13px; font-weight: 700; color: #fff; background: var(--fail);
+  }
+  .browser .stamp.heal { background: var(--jev); }
+  .browser .stamp[hidden] { display: none; }
+  .lane.jev { border-color: var(--jev); box-shadow: inset 4px 0 0 var(--jev); }
+  .lane-head { display: flex; align-items: center; gap: 20px; padding: 10px 20px 8px 24px; border-bottom: 1px solid var(--rule); }
+  .lane-name { font-size: 22px; font-weight: 700; }
+  .lane-name small { display: block; font-size: 15px; font-weight: 400; color: var(--muted); }
+  .lane.jev .lane-name { color: var(--jev); }
+  .phase { margin-left: auto; font-size: 16px; color: var(--muted); text-align: right; }
+  .clock {
+    font-variation-settings: "wdth" 125;
+    font-weight: 850;
+    font-size: 54px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    min-width: 250px;
+    text-align: right;
+  }
+  .lane.done .clock { color: var(--pass); }
+  .lane.jev.done .clock { color: var(--jev); }
+
+  .rows { position: relative; display: grid; grid-auto-rows: 1fr; padding: 4px 20px 6px 24px; }
+  .row { display: grid; grid-template-columns: var(--label-width) 1fr; align-items: center; gap: 12px; min-height: 0; }
+  .test-name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .track { position: relative; height: 100%; }
+  .track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--rule); }
+  .bar {
+    position: absolute; top: 22%; height: 56%; min-width: 3px; border-radius: 2px;
+    background: var(--idle);
+  }
+  .bar.running { background: repeating-linear-gradient(-45deg, var(--wait) 0 8px, #e8b54e 8px 16px); }
+  .bar.passed { background: var(--pass); }
+  .bar.failed { background: var(--fail); }
+  .bar.healed { background: var(--jev); }
+  .bar.retry { box-shadow: -3px 0 0 var(--panel); }
+  .note {
+    position: absolute; top: 50%; transform: translateY(-50%); padding-left: 10px;
+    font-size: 14px; font-weight: 600; white-space: nowrap;
+  }
+  .note.bug { color: var(--fail); }
+  .note.rerun { color: var(--wait); }
+  .note.heal { color: var(--jev); }
+  .note.fail { color: var(--fail); }
+  .note.flaky { color: var(--wait); }
+
+  .axis { display: grid; grid-template-columns: var(--label-width) 1fr; gap: 12px; padding: 0 20px 0 24px; margin-left: 560px; font-size: 13px; color: var(--muted); }
+  .ticks { position: relative; height: 18px; }
+  .tick { position: absolute; transform: translateX(-50%); font-variant-numeric: tabular-nums; }
+
+  .legend { display: flex; gap: 22px; font-size: 14px; color: var(--muted); padding-left: calc(560px + var(--label-width) + 44px); }
+  .legend span::before { content: ""; display: inline-block; width: 14px; height: 10px; margin-right: 6px; border-radius: 2px; vertical-align: 0; background: var(--swatch); }
+
+  /* Title and end cards */
+  .card {
+    position: fixed; inset: 0; display: grid; place-items: center;
+    background: var(--fog);
+    transition: opacity 500ms ease;
+  }
+  .card[hidden] { display: none; }
+  .card .inner { width: min(1100px, 90vw); }
+  .card h2 { margin: 0 0 12px; font-size: 52px; line-height: 1.08; letter-spacing: -0.02em; font-weight: 800; }
+  .card .lede { margin: 0 0 32px; font-size: 24px; color: var(--muted); max-width: 60ch; line-height: 1.4; }
+  .breaks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 0; padding: 0; list-style: none; }
+  .breaks li { border-top: 4px solid var(--ink); padding-top: 12px; font-size: 20px; line-height: 1.35; }
+  .breaks b { display: block; font-size: 24px; margin-bottom: 4px; }
+
+  .tally { width: 100%; border-collapse: collapse; font-size: 22px; }
+  .tally th, .tally td { padding: 14px 0; border-bottom: 1px solid var(--rule); text-align: right; }
+  .tally th:first-child, .tally td:first-child { text-align: left; color: var(--muted); font-weight: 400; }
+  .tally thead th { font-size: 18px; color: var(--muted); font-weight: 600; }
+  .tally thead th.jev { color: var(--jev); }
+  .tally td { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .tally td.jev { color: var(--jev); }
+  .tally tr.hero td:not(:first-child) { font-size: 48px; font-weight: 850; font-variation-settings: "wdth" 115; }
+  .fine { margin: 18px 0 0; font-size: 15px; color: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) { .card { transition: none; } }
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="headline">
+    <h1 id="headline">Same tests, same machine, two pipelines</h1>
+    <p id="subhead"></p>
+  </div>
+
+  <section class="lane standard" id="lane-standard" aria-label="Standard Playwright">
+    <div class="lane-head">
+      <div class="lane-name">Standard Playwright<small>Retries every failure twice</small></div>
+      <div class="phase" id="phase-standard">Waiting to start</div>
+      <div class="clock" id="clock-standard">0.0s</div>
+    </div>
+    <div class="lane-body">
+      <div class="browsers" id="browsers-standard"></div>
+      <div class="rows" id="rows-standard"></div>
+    </div>
+  </section>
+
+  <section class="lane jev" id="lane-jev" aria-label="Playwright with JEV">
+    <div class="lane-head">
+      <div class="lane-name">Playwright with JEV<small>Heals renamed elements, reruns only what can pass</small></div>
+      <div class="phase" id="phase-jev">Waiting to start</div>
+      <div class="clock" id="clock-jev">0.0s</div>
+    </div>
+    <div class="lane-body">
+      <div class="browsers" id="browsers-jev"></div>
+      <div class="rows" id="rows-jev"></div>
+    </div>
+  </section>
+
+  <div>
+    <div class="axis"><span></span><div class="ticks" id="ticks"></div></div>
+    <div class="legend">
+      <span style="--swatch: var(--wait)">Waiting for the page</span>
+      <span style="--swatch: var(--pass)">Passed</span>
+      <span style="--swatch: var(--fail)">Failed</span>
+      <span style="--swatch: var(--jev)">Healed by JEV</span>
+    </div>
+  </div>
+</div>
+
+<div class="card" id="title-card">
+  <div class="inner" id="title-inner"></div>
+</div>
+
+<div class="card" id="end-card" hidden>
+  <div class="inner">
+    <h2 id="end-title">Results</h2>
+    <p class="lede" id="end-lede"></p>
+    <table class="tally">
+      <thead><tr><th></th><th>Standard Playwright</th><th class="jev">Playwright with JEV</th></tr></thead>
+      <tbody id="tally"></tbody>
+    </table>
+    <p class="fine" id="fine"></p>
+  </div>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search)
+  const release = params.get("release") ?? "v2"
+  const provider = params.get("provider") ?? "openrouter"
+  const lanes = ["standard", "jev"]
+  const state = {
+    startAt: null,
+    doneAt: {},
+    phase: {},
+    tests: [],
+    rows: { standard: new Map(), jev: new Map() },
+    decisions: [],
+    triage: new Map(),
+  }
+
+  // Title card copy depends on the release being tested.
+  const titleInner = document.getElementById("title-inner")
+  titleInner.innerHTML =
+    release === "v2"
+      ? `<h2>Release 2 just shipped.<br>Three things changed.</h2>
+         <p class="lede">Both pipelines run the same 10 end-to-end tests against the new release, at the same time, with 4 parallel workers each.</p>
+         <ul class="breaks">
+           <li><b>A button was renamed</b>"Checkout" is now "Go to checkout". The test is out of date, the shop works.</li>
+           <li><b>The cart total is wrong</b>A real bug: the total skips the last item. Someone needs to fix the shop.</li>
+           <li><b>Search is slow once</b>The first search after a release waits on a cold cache. Trying again works.</li>
+         </ul>`
+      : `<h2>Release 1: nothing is broken.</h2>
+         <p class="lede">Both pipelines run the same 10 end-to-end tests at the same time. This round checks that JEV adds no delay when every test passes.</p>`
+
+  document.getElementById("subhead").textContent =
+    release === "v2" ? "Release 2: a renamed button, a cart bug, a slow first search" : "Release 1: control round, nothing broken"
+
+  function seconds(ms) {
+    return `${(ms / 1000).toFixed(1)}s`
+  }
+
+  const tiles = { standard: [], jev: [] }
+  for (const lane of lanes) {
+    const grid = document.getElementById(`browsers-${lane}`)
+    for (let worker = 0; worker < 4; worker++) {
+      const tile = document.createElement("div")
+      tile.className = "browser"
+      tile.innerHTML = `<div class="bar-top">Worker ${worker + 1} idle</div><img alt=""><div class="stamp" hidden></div>`
+      grid.append(tile)
+      tiles[lane].push({ el: tile, bar: tile.querySelector(".bar-top"), img: tile.querySelector("img"), stamp: tile.querySelector(".stamp"), title: null, since: 0 })
+    }
+  }
+
+  function showFrame(event) {
+    const tile = tiles[event.lane]?.[event.worker]
+    if (!tile) return
+    tile.img.src = `data:image/jpeg;base64,${event.data}`
+    if (tile.title !== event.title) {
+      tile.title = event.title
+      tile.since = Date.now()
+      tile.stamp.hidden = true
+    }
+  }
+
+  function tileFor(lane, title) {
+    return tiles[lane].find((tile) => tile.title === title)
+  }
+
+  function buildRows() {
+    for (const lane of lanes) {
+      const container = document.getElementById(`rows-${lane}`)
+      container.innerHTML = ""
+      for (const title of state.tests) {
+        const row = document.createElement("div")
+        row.className = "row"
+        row.innerHTML = `<div class="test-name"></div><div class="track"></div>`
+        row.querySelector(".test-name").textContent = title
+        container.append(row)
+        state.rows[lane].set(title, { track: row.querySelector(".track"), attempts: [], note: null })
+      }
+    }
+  }
+
+  function row(lane, title) {
+    if (!state.rows[lane].has(title)) {
+      state.tests.push(title)
+      buildRows()
+    }
+    return state.rows[lane].get(title)
+  }
+
+  function setNote(entry, text, kind) {
+    entry.note = { text, kind }
+  }
+
+  function handle(event) {
+    switch (event.type) {
+      case "frame":
+        showFrame(event)
+        return
+      case "start":
+        state.startAt = event.at
+        document.getElementById("title-card").style.opacity = "0"
+        setTimeout(() => document.getElementById("title-card").hidden = true, 500)
+        break
+      case "suite":
+        if (state.tests.length === 0) {
+          state.tests = event.tests.map((test) => test.title)
+          buildRows()
+        }
+        break
+      case "phase":
+        state.phase[event.lane] = event.label
+        break
+      case "test-begin": {
+        const entry = row(event.lane, event.title)
+        entry.attempts.push({ start: event.at, end: null, status: "running", retry: entry.attempts.length > 0 })
+        break
+      }
+      case "test-end": {
+        const entry = row(event.lane, event.title)
+        const attempt = [...entry.attempts].reverse().find((item) => item.end === null)
+        if (!attempt) break
+        attempt.end = event.at
+        const healed = event.healed?.length > 0
+        attempt.status = event.ok ? (healed ? "healed" : "passed") : "failed"
+        const tile = tileFor(event.lane, event.title)
+        if (tile) {
+          tile.stamp.hidden = !(healed || !event.ok)
+          tile.stamp.className = `stamp${healed ? " heal" : ""}`
+          tile.stamp.textContent = healed ? "Healed" : `Failed after ${seconds(event.durationMs)}`
+        }
+        const count = entry.attempts.length
+        if (event.ok && healed) setNote(entry, `Healed: button renamed to "${event.healed[0].element?.match(/"(.+)"/)?.[1] ?? "?"}"`, "heal")
+        else if (event.ok && count > 1) setNote(entry, event.lane === "jev" ? "Passed on the targeted rerun" : `Passed on retry ${count - 1}`, "flaky")
+        else if (!event.ok && event.lane === "standard" && count >= 3) setNote(entry, `Failed ${count}×`, "fail")
+        break
+      }
+      case "triage":
+        for (const result of event.results) {
+          const title = result.title.split(" > ").at(-1)
+          const entry = row("jev", title)
+          if (result.retry.recommended) setNote(entry, `JEV: ${label(result.category)}, so rerun it`, "rerun")
+          else if (result.heal.recommended) setNote(entry, `JEV: ${label(result.category)}, so update the test`, "heal")
+          else setNote(entry, `JEV: ${label(result.category)}, sent to a person`, "bug")
+          state.triage.set(title, result)
+        }
+        break
+      case "decision":
+        state.decisions.push(event)
+        break
+      case "lane-done":
+        state.doneAt[event.lane] = event.at
+        document.getElementById(`lane-${event.lane}`).classList.add("done")
+        state.phase[event.lane] = "Final answer ready"
+        break
+      case "finish":
+        setTimeout(showEndCard, 1500)
+        break
+    }
+  }
+
+  function label(category) {
+    return {
+      app_bug: "app bug",
+      locator_drift: "renamed element",
+      timing: "slow page",
+      environment: "infrastructure",
+      test_data: "test data",
+      assertion_outdated: "outdated check",
+    }[category] ?? category
+  }
+
+  function render() {
+    const now = Date.now()
+    const total = Math.max(20_000, ...lanes.map((lane) => (state.doneAt[lane] ?? now) - (state.startAt ?? now))) * 1.04
+    for (const lane of lanes) {
+      const end = state.doneAt[lane] ?? now
+      document.getElementById(`clock-${lane}`).textContent = seconds(state.startAt === null ? 0 : end - state.startAt)
+      document.getElementById(`phase-${lane}`).textContent = state.phase[lane] ?? "Waiting to start"
+      for (const entry of state.rows[lane].values()) {
+        const bars = entry.attempts.map((attempt) => {
+          const left = ((attempt.start - state.startAt) / total) * 100
+          const width = Math.max(0.3, (((attempt.end ?? now) - attempt.start) / total) * 100)
+          return `<div class="bar ${attempt.status}${attempt.retry ? " retry" : ""}" style="left:${left}%;width:${width}%"></div>`
+        })
+        const last = entry.attempts.at(-1)
+        const furthest = Math.max(...entry.attempts.map((attempt) => attempt.end ?? now))
+        const noteLeft = last ? ((furthest - state.startAt) / total) * 100 : 0
+        const note = entry.note && last?.end
+          ? `<div class="note ${entry.note.kind}" style="left:${noteLeft}%"></div>`
+          : ""
+        entry.track.innerHTML = bars.join("") + note
+        if (note) entry.track.querySelector(".note").textContent = entry.note.text
+      }
+    }
+    for (const lane of lanes) {
+      for (const tile of tiles[lane]) {
+        const entry = tile.title && state.rows[lane].get(tile.title)
+        const running = entry?.attempts.at(-1)?.end === null
+        const waited = running ? now - entry.attempts.at(-1).start : 0
+        tile.el.classList.toggle("running", running && waited < 8_000)
+        tile.el.classList.toggle("stuck", running && waited >= 8_000)
+        if (!tile.title) continue
+        const retry = entry ? entry.attempts.length - 1 : 0
+        tile.bar.textContent = running
+          ? `${tile.title}${retry ? ` (retry ${retry})` : ""}, waiting ${seconds(waited)}`
+          : tile.title
+      }
+    }
+    const step = total > 90_000 ? 20_000 : total > 45_000 ? 10_000 : 5_000
+    const ticks = []
+    for (let t = 0; t <= total; t += step) ticks.push(`<span class="tick" style="left:${(t / total) * 100}%">${t / 1000}s</span>`)
+    document.getElementById("ticks").innerHTML = ticks.join("")
+    requestAnimationFrame(render)
+  }
+
+  function laneStats(lane) {
+    const entries = [...state.rows[lane].values()]
+    const attempts = entries.reduce((sum, entry) => sum + entry.attempts.length, 0)
+    const reruns = attempts - entries.length
+    const failed = entries.filter((entry) => entry.attempts.at(-1)?.status === "failed").length
+    return { ms: state.doneAt[lane] - state.startAt, attempts, reruns, failed }
+  }
+
+  function showEndCard() {
+    const standard = laneStats("standard")
+    const jev = laneStats("jev")
+    const ratio = standard.ms / jev.ms
+    const priced = state.decisions.filter((decision) => typeof decision.costUsd === "number")
+    const cost = priced.reduce((sum, decision) => sum + decision.costUsd, 0)
+    const avgLatency = state.decisions.length
+      ? Math.round(state.decisions.reduce((sum, decision) => sum + decision.latencyMs, 0) / state.decisions.length)
+      : 0
+    const bugs = [...state.triage.values()].filter((result) => !result.retry.recommended && !result.heal.recommended)
+
+    document.getElementById("end-title").textContent =
+      release === "v2" && ratio >= 1.5
+        ? `A trustworthy answer ${ratio.toFixed(ratio >= 10 ? 0 : 1)}× sooner`
+        : "No difference when nothing breaks"
+    document.getElementById("end-lede").textContent =
+      release === "v2"
+        ? `Standard Playwright waited out timeouts and retried a real bug. JEV healed the renamed button, reran only the slow search, and flagged ${bugs.length === 1 ? "the cart bug" : `${bugs.length} bug(s)`} for a person.`
+        : "When every test passes, JEV makes no calls and both pipelines finish together."
+
+    const rows = [
+      ["Time to a final answer", seconds(standard.ms), seconds(jev.ms), "hero"],
+      ["Test attempts", standard.attempts, jev.attempts],
+      ["Reruns", standard.reruns, jev.reruns],
+      ["Tests left failing", standard.failed, jev.failed],
+      ["Failures sent on to an AI healer", standard.failed, 0],
+      ["JEV decisions made", "none", state.decisions.length ? `${state.decisions.length}, about ${avgLatency} ms each` : "none needed"],
+      ["JEV cost for this run", "none", !state.decisions.length ? "$0" : priced.length ? `$${cost.toFixed(4)}` : "not reported"],
+    ]
+    document.getElementById("tally").innerHTML = rows
+      .map(([name, a, b, kind]) => `<tr class="${kind ?? ""}"><td>${name}</td><td>${a}</td><td class="jev">${b}</td></tr>`)
+      .join("")
+    document.getElementById("fine").textContent =
+      `Measured live on one laptop with ${provider === "typesafe" ? "TypeSafe" : "OpenRouter"} JEV and no decision cache. ` +
+      "Standard Playwright uses the retries: 2 setting Playwright generates for CI." +
+      (jev.failed ? " The failing test left in the JEV lane is the real cart bug." : "")
+    const card = document.getElementById("end-card")
+    card.hidden = false
+    card.style.opacity = "0"
+    requestAnimationFrame(() => (card.style.opacity = "1"))
+  }
+
+  const stream = new EventSource("/stream")
+  stream.onmessage = (message) => handle(JSON.parse(message.data))
+  requestAnimationFrame(render)
+  document.fonts.ready.then(() => (window.dashboardReady = true))
+</script>
+</body>
+</html>

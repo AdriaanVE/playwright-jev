@@ -1,6 +1,6 @@
 {
   "name": "playwright-jev",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Structured JEV decisions for Playwright: failure triage, smart retries, healer gating, snapshot pruning, locator healing, semantic assertions, and test impact ordering.",
   "type": "module",
   "license": "UNLICENSED",
@@ -37,7 +37,9 @@
     "test": "vitest run",
     "test:e2e": "npm run build && playwright test -c e2e/playwright.config.ts && node e2e/mcp-proxy.check.mjs",
     "format": "biome check --write .",
-    "check": "biome ci . && tsc -p tsconfig.json"
+    "check": "biome ci . && tsc -p tsconfig.json",
+    "demo": "npm run build && node demo/race.mjs",
+    "demo:record": "npm run build && node demo/race.mjs --record"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1"

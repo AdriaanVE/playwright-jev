@@ -3,6 +3,14 @@
 All notable changes to this project are documented in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and Semantic Versioning.
 
+## [0.3.0] - 2026-09-24
+
+### Added
+
+- A recordable side-by-side demo (`npm run demo`, `npm run demo:record`) that races standard
+  Playwright against playwright-jev on a shop release with a renamed button, a real bug, and a slow
+  first search, showing live browsers, a timeline, stopwatches, and a final tally.
+
 ## [0.2.0] - 2026-09-24
 
 ### Added

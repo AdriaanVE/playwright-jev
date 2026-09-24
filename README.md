@@ -25,6 +25,7 @@ everything off.
 - [Agent skill](skills/playwright-jev/SKILL.md): instructions for coding agents (Claude Code and others)
   that fix tests or drive the browser in a project using playwright-jev
 - [Example config](examples/playwright-jev.config.ts)
+- [Demo](demo/README.md): a recordable side-by-side race against standard Playwright
 
 | # | Feature | Where | Decision |
 | --- | --- | --- | --- |
