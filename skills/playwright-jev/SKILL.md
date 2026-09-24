@@ -13,7 +13,8 @@ or full page snapshot yourself.
 1. Confirm `playwright-jev` is in `package.json` devDependencies.
 2. Confirm `playwright.config.ts` lists `"playwright-jev/reporter"` in `reporter`. If it does not, add it
    only when the user asked you to set up playwright-jev.
-3. Decisions need a provider key, `OPENROUTER_API_KEY` by default. If triage results show
+3. Decisions need a provider key: `OPENROUTER_API_KEY` by default, or `TYPESAFE_API_KEY` when the config
+   uses `provider: { type: "typesafe" }`. If triage results show
    `error: "... is not set."`, tell the user which variable is missing. Never print or ask for the value.
 
 ## Fix failing tests

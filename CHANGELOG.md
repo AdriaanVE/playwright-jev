@@ -3,6 +3,18 @@
 All notable changes to this project are documented in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and Semantic Versioning.
 
+## [0.2.0] - 2026-09-24
+
+### Added
+
+- `typesafe` provider for TypeSafe's own JEV API, with `jev-latest`, `TYPESAFE_API_KEY`, and the
+  TypeSafe SDK's `TYPESAFE_BASE_URL` and `TYPESAFE_DEFAULT_MODEL` variables.
+
+### Fixed
+
+- Triage reports no longer show a $0 decision cost when the provider does not report cost. They show
+  input tokens and say the cost was not reported, and cached decisions no longer count as calls.
+
 ## [0.1.0] - 2026-09-24
 
 ### Added

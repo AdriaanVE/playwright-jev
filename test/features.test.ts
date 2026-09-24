@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest"
 import { scoreSpecs, summarizeSpec } from "../src/features/impact.js"
 import { describeIntent, rankCandidates, suggestLocator } from "../src/features/locator-healing.js"
 import { extractSnapshot, extractSnapshotLink, pruneSnapshot, verifyStep } from "../src/features/snapshot-pruning.js"
-import { parseErrorContext, renderMarkdown, summarize, triageFailure } from "../src/features/triage.js"
+import { describeCost, parseErrorContext, renderMarkdown, summarize, triageFailure } from "../src/features/triage.js"
 import { describeNode, parseSnapshot, splitRegions } from "../src/snapshot.js"
 import type { QuestionSpec } from "../src/types.js"
 import { cartSnapshot, fakeProvider, testConfig } from "./helpers.js"
@@ -110,6 +110,36 @@ describe("triage (features 1-3)", () => {
     )
     expect(summary.totals).toMatchObject({ failures: 2, retry: 1, heal: 0, human: 1 })
     expect(renderMarkdown(summary)).toContain("| a \\| b | app_bug | 90% | review |")
+  })
+
+  it("reports cost only when the provider does", async () => {
+    const config = await testConfig(fakeProvider(() => ({})))
+    const base = {
+      testId: "1",
+      name: "b",
+      title: "b",
+      file: "f",
+      category: "timing",
+      confidence: 0.9,
+      probabilities: {},
+      retry: { probability: 0.9, recommended: true },
+      heal: { probability: 0, recommended: false },
+      cached: false,
+    }
+    const priced = { ...base, usage: { inputTokens: 100, outputTokens: 0, costUsd: 0.00002 } }
+    const unpriced = { ...base, usage: { inputTokens: 80, outputTokens: 0, costUsd: null } }
+    const cached = { ...priced, cached: true }
+
+    expect(describeCost(summarize([unpriced], config).totals)).toBe(
+      "Decision cost: not reported by the provider (80 input tokens).",
+    )
+    expect(describeCost(summarize([priced, cached], config).totals)).toBe(
+      "Decision cost: $0.000020 (100 input tokens).",
+    )
+    expect(describeCost(summarize([priced, unpriced], config).totals)).toBe(
+      "Decision cost: $0.000020 (180 input tokens, plus 1 call(s) without a reported cost).",
+    )
+    expect(describeCost(summarize([cached], config).totals)).toBe("Decision cost: none.")
   })
 
   it("parses Playwright's error-context attachment", () => {

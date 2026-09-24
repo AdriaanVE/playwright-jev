@@ -1,7 +1,8 @@
 # playwright-jev
 
 Structured decisions for Playwright. `playwright-jev` sends small typed questions to a decision model,
-by default [JEV on OpenRouter](https://openrouter.ai/docs/guides/community/jev), at points where a test
+by default [JEV on OpenRouter](https://openrouter.ai/docs/guides/community/jev) or
+[TypeSafe's own JEV API](https://docs.typesafe.ai/api), at points where a test
 suite or a Playwright agent would otherwise rerun everything, wait on a human, or spend a full LLM turn.
 
 It is an add-on to `@playwright/test`, not a fork. You keep running `npx playwright test`. Each feature
@@ -42,7 +43,7 @@ Features 1 to 3 share one decision per failure.
 
 ```sh
 npm install -D playwright-jev
-export OPENROUTER_API_KEY=...
+export OPENROUTER_API_KEY=...   # or TYPESAFE_API_KEY with provider type "typesafe"
 ```
 
 Requires Node 22 and `@playwright/test` 1.63 or newer (the version this package is tested with).
@@ -57,7 +58,8 @@ The provider is open-ended:
 
 | `provider.type` | Use |
 | --- | --- |
-| `openrouter` (default) | OpenRouter Decisions API. Override `model`, `baseUrl`, `path`, `apiKeyEnv`, `headers`, or `extraBody`. |
+| `openrouter` (default) | OpenRouter Decisions API, `typesafe/jev-1.13`, `OPENROUTER_API_KEY`. Override `model`, `baseUrl`, `path`, `apiKeyEnv`, `headers`, or `extraBody`. |
+| `typesafe` | TypeSafe's JEV API at `api.typesafe.ai/v1/systemone`, `jev-latest`, `TYPESAFE_API_KEY`. Honors the TypeSafe SDK variables `TYPESAFE_BASE_URL` and `TYPESAFE_DEFAULT_MODEL`. Same overrides as `openrouter`. |
 | `http` | Any endpoint. Set `url` and auth, and add `mapRequest` and `mapResponse` when the wire format differs. |
 | `module` | Your own module that exports a `DecisionProvider`, or a factory that returns one. |
 | instance | Pass an object with `name` and `decide(request)` directly. |
@@ -88,7 +90,9 @@ export default defineConfig({
 
 After a run, `.playwright-jev/` contains:
 
-- `triage.json` and `triage.md`: cause, confidence, and next step per failure (ready for a PR comment)
+- `triage.json` and `triage.md`: cause, confidence, and next step per failure, plus decision cost (ready for a PR
+  comment). OpenRouter reports cost per call. TypeSafe's API reports tokens only, so the cost line then
+  shows input tokens and says the provider did not report a cost.
 - `retry.json`: failures triaged as transient, in Playwright's `.last-run.json` format
 - `heal.json`: failures the LLM healer should attempt
 

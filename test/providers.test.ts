@@ -6,6 +6,7 @@ import { loadConfig, resolveConfig } from "../src/config.js"
 import { cachedProvider, stableStringify } from "../src/providers/cache.js"
 import { DecisionHttpError, httpProvider } from "../src/providers/http.js"
 import { openRouterProvider } from "../src/providers/openrouter.js"
+import { typeSafeProvider } from "../src/providers/typesafe.js"
 import { noul } from "../src/questions.js"
 import { fakeProvider } from "./helpers.js"
 
@@ -56,6 +57,47 @@ describe("openRouterProvider", () => {
   it("fails clearly when the key variable is missing", async () => {
     vi.stubEnv("OPENROUTER_API_KEY", "")
     await expect(openRouterProvider({ fetch: mockFetch() }).decide(request)).rejects.toThrow("OPENROUTER_API_KEY")
+  })
+})
+
+describe("typeSafeProvider", () => {
+  it("posts to TypeSafe's System One API with jev-latest and TYPESAFE_API_KEY", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", "ts-key")
+    vi.stubEnv("TYPESAFE_BASE_URL", "")
+    vi.stubEnv("TYPESAFE_DEFAULT_MODEL", "")
+    const body = { model: "jev-1.13", answers: okBody.answers, usage: { input_tokens: 42, output_tokens: 0 } }
+    const fetch = mockFetch(Response.json(body))
+    const response = await typeSafeProvider({ fetch }).decide(request)
+
+    const [url, init] = fetch.mock.calls[0] ?? []
+    expect(url).toBe("https://api.typesafe.ai/v1/systemone")
+    expect((init?.headers as Record<string, string> | undefined)?.authorization).toBe("Bearer ts-key")
+    expect(JSON.parse(String(init?.body))).toEqual({ model: "jev-latest", ...request })
+    expect(response.usage).toEqual({ inputTokens: 42, outputTokens: 0, costUsd: null })
+  })
+
+  it("reads the TypeSafe SDK's base URL and model variables, and options override them", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", "k")
+    vi.stubEnv("TYPESAFE_BASE_URL", "https://typesafe.internal/")
+    vi.stubEnv("TYPESAFE_DEFAULT_MODEL", "jev-1.13")
+    const fetch = mockFetch(Response.json(okBody), Response.json(okBody))
+    await typeSafeProvider({ fetch }).decide(request)
+    await typeSafeProvider({ fetch, model: "jev-2" }).decide(request)
+
+    expect(fetch.mock.calls[0]?.[0]).toBe("https://typesafe.internal/v1/systemone")
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).model).toBe("jev-1.13")
+    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body)).model).toBe("jev-2")
+  })
+
+  it("is selected with provider type typesafe and keeps its key variable behind PLAYWRIGHT_JEV_URL", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", "")
+    const direct = await resolveConfig({ cache: { mode: "off" }, provider: { type: "typesafe" } })
+    expect(direct.provider.name).toBe("typesafe")
+    await expect(direct.provider.decide(request)).rejects.toThrow("TYPESAFE_API_KEY is not set.")
+
+    vi.stubEnv("PLAYWRIGHT_JEV_URL", "https://proxy.example/decide")
+    const proxied = await resolveConfig({ cache: { mode: "off" }, provider: { type: "typesafe", apiKey: "secret" } })
+    await expect(proxied.provider.decide(request)).rejects.toThrow("TYPESAFE_API_KEY is not set.")
   })
 })
 

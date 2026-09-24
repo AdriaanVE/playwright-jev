@@ -4,6 +4,9 @@ export default defineConfig({
   // Default: OpenRouter Decisions API with typesafe/jev-1.13 and OPENROUTER_API_KEY.
   provider: { type: "openrouter", model: "typesafe/jev-1.13" },
 
+  // TypeSafe's own JEV API, with TYPESAFE_API_KEY:
+  // provider: { type: "typesafe", model: "jev-latest" },
+
   // Any endpoint that accepts { model, state, questions } and returns { answers }:
   // provider: { type: "http", url: "https://decisions.internal.example/api/decide", apiKeyEnv: "DECISIONS_KEY" },
 

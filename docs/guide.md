@@ -42,8 +42,8 @@ What stays the same:
                      npx playwright test               │ decisions
                               │                        ▼
                   playwright-jev/reporter ────────► DecisionProvider ◄──── playwright-jev mcp
-                              │                (OpenRouter JEV, HTTP,      (agent's MCP server)
-                              ▼                 or your module)
+                              │                (OpenRouter or TypeSafe     (agent's MCP server)
+                              ▼                 JEV, HTTP, or your module)
              .playwright-jev/triage.md, retry.json, heal.json
                               │
           playwright-jev retry          playwright-jev heal
@@ -56,6 +56,9 @@ What stays the same:
 npm install -D playwright-jev
 export OPENROUTER_API_KEY=...
 ```
+
+To call TypeSafe directly instead of through OpenRouter, export `TYPESAFE_API_KEY` and add
+`playwright-jev.config.ts` with `provider: { type: "typesafe" }`. See [Providers](#providers).
 
 Add the reporter, and let `playwright-jev` decide what to rerun:
 
@@ -207,7 +210,7 @@ A GitHub Actions job that uses triage, targeted retries, and the healer gate:
   id: e2e
   continue-on-error: true
   env:
-    OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+    OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }} # or TYPESAFE_API_KEY
 
 - name: Rerun transient failures
   if: steps.e2e.outcome == 'failure'
@@ -305,7 +308,26 @@ as reporter options (`["playwright-jev/reporter", { ... }]`) replaces the file f
 
 ### Providers
 
+JEV is available from two hosted APIs with the same request and response format. Both are built in:
+
+| | `openrouter` (default) | `typesafe` |
+| --- | --- | --- |
+| Endpoint | `https://openrouter.ai/api/alpha/decisions` | `https://api.typesafe.ai/v1/systemone` |
+| Default model | `typesafe/jev-1.13` | `jev-latest` |
+| Key variable | `OPENROUTER_API_KEY` | `TYPESAFE_API_KEY` |
+| Other variables | none | `TYPESAFE_BASE_URL`, `TYPESAFE_DEFAULT_MODEL`, as in the TypeSafe SDKs |
+| Cost in reports | Reported per call | Not reported; input tokens are shown instead |
+
+Pin a model version (for example `typesafe/jev-1.13` or `jev-1.13`) when thresholds matter, because
+`jev-latest` can change under you. Changing the model or provider also changes the cache key.
+
 ```ts
+// TypeSafe's own API
+provider: { type: "typesafe" }
+
+// TypeSafe with a pinned model or a regional or private base URL
+provider: { type: "typesafe", model: "jev-1.13", baseUrl: "https://typesafe.internal" }
+
 // OpenRouter with another model or gateway
 provider: { type: "openrouter", model: "typesafe/jev-1.13", baseUrl: "https://gateway.example/openrouter" }
 
@@ -392,7 +414,8 @@ accounts, or use a provider you host yourself. API keys are never written to the
 
 | Symptom | Cause and fix |
 | --- | --- |
-| `OPENROUTER_API_KEY is not set.` in `triage.json` | Export the key, or set `provider.apiKeyEnv` |
+| `OPENROUTER_API_KEY is not set.` or `TYPESAFE_API_KEY is not set.` in `triage.json` | Export the key for your provider, or set `provider.apiKeyEnv` |
+| Triage says "cost not reported by the provider" | Expected with `typesafe`; its API returns tokens, not cost |
 | Every failure says `unknown` and `rerun` | Decision calls are failing; see the `error` field in `triage.json` |
 | `retry` reruns nothing | No failure reached `retry.threshold`; check `triage.md` |
 | Healing never acts | Mode is `report`, or probabilities are below `locatorHealing.threshold`; read `jevHealEvents` |

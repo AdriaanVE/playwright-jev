@@ -4,10 +4,12 @@ import { pathToFileURL } from "node:url"
 import { cachedProvider } from "./providers/cache.js"
 import { type HttpProviderOptions, httpProvider } from "./providers/http.js"
 import { type OpenRouterOptions, openRouterProvider } from "./providers/openrouter.js"
+import { type TypeSafeOptions, typeSafeProvider } from "./providers/typesafe.js"
 import type { DecisionProvider } from "./types.js"
 
 export type ProviderConfig =
   | ({ type: "openrouter" } & OpenRouterOptions)
+  | ({ type: "typesafe" } & TypeSafeOptions)
   | ({ type: "http" } & HttpProviderOptions)
   /** Load a module whose export is a DecisionProvider or a factory `(options) => DecisionProvider`. */
   | { type: "module"; module: string; export?: string; options?: unknown }
@@ -179,8 +181,13 @@ function applyEnv(provider: ProviderConfig | DecisionProvider): ProviderConfig |
   if (!url) return overridden
   // A new endpoint never inherits a literal key; it authenticates from a variable instead.
   const { apiKey: _key, ...rest } = overridden
-  const keyEnv = rest.apiKeyEnv ?? (provider.type === "openrouter" ? "OPENROUTER_API_KEY" : undefined)
+  const keyEnv = rest.apiKeyEnv ?? defaultKeyEnv[provider.type]
   return { ...rest, ...(keyEnv ? { apiKeyEnv: keyEnv } : {}), type: "http", url }
+}
+
+const defaultKeyEnv: Partial<Record<ProviderConfig["type"], string>> = {
+  openrouter: "OPENROUTER_API_KEY",
+  typesafe: "TYPESAFE_API_KEY",
 }
 
 async function createProvider(provider: ProviderConfig | DecisionProvider, cwd: string): Promise<DecisionProvider> {
@@ -189,6 +196,10 @@ async function createProvider(provider: ProviderConfig | DecisionProvider, cwd: 
     case "openrouter": {
       const { type: _, ...options } = provider
       return openRouterProvider(options)
+    }
+    case "typesafe": {
+      const { type: _, ...options } = provider
+      return typeSafeProvider(options)
     }
     case "http": {
       const { type: _, ...options } = provider

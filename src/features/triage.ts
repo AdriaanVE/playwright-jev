@@ -127,7 +127,18 @@ export type TriageSummary = {
   generatedAt: string
   provider: string
   thresholds: { retry: number; healerGate: number }
-  totals: { failures: number; retry: number; heal: number; human: number; errors: number; costUsd: number }
+  totals: {
+    failures: number
+    retry: number
+    heal: number
+    human: number
+    errors: number
+    /** Sum of reported costs, or null when no call reported one. */
+    costUsd: number | null
+    /** Calls that were made but did not report a cost, for example on TypeSafe's own API. */
+    unpricedCalls: number
+    inputTokens: number
+  }
   byCategory: Record<string, number>
   results: TriageResult[]
 }
@@ -145,11 +156,31 @@ export function summarize(results: TriageResult[], config: ResolvedConfig): Tria
       heal: results.filter((result) => !result.retry.recommended && result.heal.recommended).length,
       human: results.filter((result) => !result.retry.recommended && !result.heal.recommended).length,
       errors: results.filter((result) => result.error).length,
-      costUsd: results.reduce((sum, result) => sum + (result.usage?.costUsd ?? 0), 0),
+      ...costTotals(results),
     },
     byCategory,
     results,
   }
+}
+
+/** Only calls that reached the provider count; cache hits and failed calls cost nothing. */
+function costTotals(results: TriageResult[]): { costUsd: number | null; unpricedCalls: number; inputTokens: number } {
+  const billed = results.filter((result) => result.usage && !result.cached)
+  const priced = billed.filter((result) => typeof result.usage?.costUsd === "number")
+  return {
+    costUsd: priced.length ? priced.reduce((sum, result) => sum + (result.usage?.costUsd ?? 0), 0) : null,
+    unpricedCalls: billed.length - priced.length,
+    inputTokens: billed.reduce((sum, result) => sum + (result.usage?.inputTokens ?? 0), 0),
+  }
+}
+
+export function describeCost(totals: TriageSummary["totals"]): string {
+  const tokens = `${totals.inputTokens} input tokens`
+  if (totals.costUsd === null) {
+    return totals.unpricedCalls ? `Decision cost: not reported by the provider (${tokens}).` : "Decision cost: none."
+  }
+  const partial = totals.unpricedCalls ? `, plus ${totals.unpricedCalls} call(s) without a reported cost` : ""
+  return `Decision cost: $${totals.costUsd.toFixed(6)} (${tokens}${partial}).`
 }
 
 export function renderMarkdown(summary: TriageSummary): string {
@@ -168,6 +199,6 @@ export function renderMarkdown(summary: TriageSummary): string {
     const title = result.title.replace(/\|/g, "\\|")
     lines.push(`| ${title} | ${result.category} | ${Math.round(result.confidence * 100)}% | ${next} |`)
   }
-  lines.push("", `Provider: ${summary.provider}. Decision cost: $${totals.costUsd.toFixed(6)}.`)
+  lines.push("", `Provider: ${summary.provider}. ${describeCost(totals)}`)
   return `${lines.join("\n")}\n`
 }
