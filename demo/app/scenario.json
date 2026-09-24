@@ -1,0 +1,59 @@
+{
+  "labels": {
+    "home shows featured products": "Home page",
+    "header links to the cart": "Cart link",
+    "product page shows the price": "Product price",
+    "add to cart updates the cart badge": "Add to cart",
+    "cart lists every line item": "Cart items",
+    "cart total adds up all line items": "Cart total",
+    "coupon code can be applied": "Coupon code",
+    "checkout opens the payment page": "Checkout",
+    "search finds products": "Search",
+    "footer links to contact": "Contact link"
+  },
+  "releases": {
+    "v1": {
+      "title": "Release 1",
+      "changes": []
+    },
+    "v2": {
+      "title": "Release 2",
+      "changes": [
+        {
+          "test": "add to cart updates the cart badge",
+          "kind": "renamed",
+          "before": "Add to cart",
+          "after": "Add to basket",
+          "what": "Button renamed"
+        },
+        {
+          "test": "coupon code can be applied",
+          "kind": "renamed",
+          "before": "Coupon code",
+          "after": "Promo code",
+          "what": "Field relabelled"
+        },
+        {
+          "test": "checkout opens the payment page",
+          "kind": "renamed",
+          "before": "Checkout",
+          "after": "Go to checkout",
+          "what": "Button renamed"
+        },
+        {
+          "test": "footer links to contact",
+          "kind": "renamed",
+          "before": "Contact us",
+          "after": "Help and contact",
+          "what": "Link turned into a button"
+        },
+        {
+          "test": "cart total adds up all line items",
+          "kind": "bug",
+          "highlight": "Total:",
+          "what": "The total skips the last item"
+        }
+      ]
+    }
+  }
+}

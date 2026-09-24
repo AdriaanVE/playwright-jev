@@ -3,6 +3,15 @@
 All notable changes to this project are documented in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and Semantic Versioning.
 
+## [0.4.0] - 2026-09-24
+
+### Changed
+
+- The demo now races the same AI-assisted suite with an LLM and with JEV answering its questions,
+  side by side, instead of comparing against plain retries. It opens with what JEV is, circles each
+  element the AI picks in the live browsers, shows every question's wait, and ends on waiting time,
+  run time, and cost per engine. Release 2 of the demo shop now has four renamed controls.
+
 ## [0.3.0] - 2026-09-24
 
 ### Added

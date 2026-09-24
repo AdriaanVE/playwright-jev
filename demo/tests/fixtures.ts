@@ -1,23 +1,36 @@
-// Both lanes run the same spec file. The standard lane uses Playwright's own `test` and `expect`; the JEV
-// lane swaps in playwright-jev's, which only adds locator healing to the `page` fixture.
+// Both lanes run this suite with playwright-jev's healing `page` and `toSatisfy`. Only the decision engine
+// behind them differs: an LLM in one lane, JEV in the other (see ../engine-provider.mjs).
 //
-// For the race dashboard, each test's browser is streamed as a screencast, so viewers can watch the
-// browsers of both lanes live. The stream is off unless DEMO_EVENTS_URL is set.
-import { expect as playwrightExpect, test as playwrightTest } from "@playwright/test"
+// For the dashboard, each test's browser is streamed as a screencast, and the current page is shared with
+// the engine provider so it can circle the element a decision picked. Both are off without DEMO_EVENTS_URL.
+
+import { readFileSync } from "node:fs"
+import path from "node:path"
 import { expect as jevExpect, test as jevTest } from "../../dist/test.js"
 
-const jev = process.env.DEMO_LANE === "jev"
-const base = (jev ? jevTest : playwrightTest) as typeof playwrightTest
-const eventsUrl = process.env.DEMO_EVENTS_URL
+const highlightScript = path.join(import.meta.dirname, "..", "app", "highlight.js")
 
-export const test = base.extend<{ screencast: undefined }>({
+const eventsUrl = process.env.DEMO_EVENTS_URL
+const lane = process.env.DEMO_LANE
+
+export type DemoContext = { page: unknown; title: string; worker: number }
+const shared = globalThis as { __demo?: DemoContext }
+
+type Change = { test: string; kind: string; highlight?: string; what: string }
+const scenario = JSON.parse(readFileSync(path.join(import.meta.dirname, "..", "app", "scenario.json"), "utf8")) as {
+  releases: Record<string, { changes: Change[] }>
+}
+const bugs = scenario.releases[process.env.DEMO_RELEASE ?? "v2"]?.changes.filter((change) => change.kind === "bug")
+
+export const test = jevTest.extend<{ screencast: undefined }>({
   screencast: [
     async ({ page }, use, testInfo) => {
+      shared.__demo = { page, title: testInfo.title, worker: testInfo.parallelIndex }
+      await page.addInitScript({ path: highlightScript })
       if (!eventsUrl) {
         await use(undefined)
         return
       }
-      const worker = testInfo.parallelIndex
       const session = await page.context().newCDPSession(page)
       let sending = false
       session.on("Page.screencastFrame", async ({ data, sessionId }) => {
@@ -28,15 +41,29 @@ export const test = base.extend<{ screencast: undefined }>({
         await fetch(`${eventsUrl}/frame`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ lane: process.env.DEMO_LANE, worker, title: testInfo.title, data }),
+          body: JSON.stringify({ lane, worker: testInfo.parallelIndex, title: testInfo.title, data }),
         }).catch(() => undefined)
         sending = false
       })
-      await session.send("Page.startScreencast", { format: "jpeg", quality: 70, maxWidth: 560, maxHeight: 360 })
+      await session.send("Page.startScreencast", { format: "jpeg", quality: 75, maxWidth: 560, maxHeight: 300 })
       await use(undefined)
+      // Circle the wrong value when a test fails on a real bug, so the frame shows what broke.
+      const bug = bugs?.find((item) => item.test === testInfo.title)
+      if (bug?.highlight && testInfo.status !== testInfo.expectedStatus) {
+        // Runs in the page, where app/highlight.js defines __demoMark.
+        await page
+          .getByText(bug.highlight)
+          .first()
+          .evaluate((element, label) => {
+            const scope = globalThis as unknown as { __demoMark?: (el: unknown, text: string, color: string) => void }
+            scope.__demoMark?.(element, label, "#e5484d")
+          }, bug.what)
+          .catch(() => undefined)
+        await page.waitForTimeout(400)
+      }
       await session.send("Page.stopScreencast").catch(() => undefined)
     },
     { auto: true },
   ],
 })
-export const expect = jev ? jevExpect : playwrightExpect
+export const expect = jevExpect

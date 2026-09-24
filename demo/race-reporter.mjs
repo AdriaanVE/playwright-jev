@@ -2,7 +2,6 @@
 // events from each side.
 const url = process.env.DEMO_EVENTS_URL
 const lane = process.env.DEMO_LANE
-const phase = process.env.DEMO_PHASE ?? "run"
 const esc = String.fromCharCode(27)
 const stripAnsi = (text) => text?.replaceAll(new RegExp(`${esc}\\[[0-9;]*m`, "g"), "")
 
@@ -15,7 +14,7 @@ export default class RaceReporter {
 
   send(type, data) {
     if (!url) return
-    const body = JSON.stringify({ type, lane, phase, ...data })
+    const body = JSON.stringify({ type, lane, ...data })
     this.pending.push(
       fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body }).catch(() => undefined),
     )

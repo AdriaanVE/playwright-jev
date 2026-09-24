@@ -2,185 +2,215 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Test Race</title>
+<title>Decision Race</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --fog: #eef1f4;
+    --page: #f4f1fb;
     --panel: #ffffff;
-    --ink: #17202b;
-    --muted: #5d6877;
-    --rule: #d6dce3;
-    --jev: #2e4bd8;
-    --pass: #2f8f5b;
-    --fail: #c8412b;
-    --wait: #d99a1e;
-    --idle: #9aa4b2;
-    --label-width: 270px;
+    --ink: #1b1530;
+    --muted: #625b78;
+    --rule: #e3def0;
+    --llm: #e2573f;
+    --llm-soft: #fde9e4;
+    --llm-deep: #a8321f;
+    --jev: #4a3aff;
+    --jev-soft: #e9e6ff;
+    --jev-deep: #2a1db8;
+    --work: #1e9e6a;
+    --bug: #d4264f;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
   body {
-    background: var(--fog);
+    background: var(--page);
     color: var(--ink);
     font-family: "Archivo", system-ui, sans-serif;
     font-variation-settings: "wdth" 100;
     overflow: hidden;
   }
+  .num { font-variant-numeric: tabular-nums; }
 
-  .frame { display: grid; grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; height: 100vh; padding: 20px 28px; }
+  /* Race screen */
+  .race { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; padding: 22px 30px 18px; gap: 16px; }
+  .top { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; }
+  .top h1 { margin: 0; font-size: 28px; font-weight: 800; }
+  .top p { margin: 0; color: var(--muted); font-size: 18px; }
+  .lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; min-height: 0; }
 
-  .headline { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; }
-  .headline h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.01em; }
-  .headline p { margin: 0; color: var(--muted); font-size: 18px; }
-
-  .lane { display: grid; grid-template-rows: auto 1fr; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; min-height: 0; }
-  .lane-body { display: grid; grid-template-columns: 560px 1fr; min-height: 0; }
-  .browsers { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 6px; padding: 8px; background: #e3e8ee; min-height: 0; }
-  .browser { position: relative; background: #fff; border-radius: 4px; overflow: hidden; min-height: 0; display: grid; grid-template-rows: 20px 1fr; }
-  .browser .bar-top { display: flex; align-items: center; gap: 6px; padding: 0 8px; background: #f6f7f9; border-bottom: 1px solid var(--rule); font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; }
-  .browser .bar-top::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--idle); flex: none; }
-  .browser.running .bar-top::before { background: var(--wait); }
-  .browser.stuck .bar-top::before { background: var(--fail); }
-  .browser img { width: 100%; height: 100%; object-fit: contain; object-position: top left; display: block; min-height: 0; }
-  .browser .stamp {
-    position: absolute; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 3px;
-    font-size: 13px; font-weight: 700; color: #fff; background: var(--fail);
+  .lane {
+    display: grid; grid-template-rows: auto auto auto auto 1fr; gap: 14px; min-height: 0;
+    border-radius: 16px; padding: 18px 20px; background: var(--panel); border-top: 10px solid var(--accent);
   }
-  .browser .stamp.heal { background: var(--jev); }
-  .browser .stamp[hidden] { display: none; }
-  .lane.jev { border-color: var(--jev); box-shadow: inset 4px 0 0 var(--jev); }
-  .lane-head { display: flex; align-items: center; gap: 20px; padding: 10px 20px 8px 24px; border-bottom: 1px solid var(--rule); }
-  .lane-name { font-size: 22px; font-weight: 700; }
-  .lane-name small { display: block; font-size: 15px; font-weight: 400; color: var(--muted); }
-  .lane.jev .lane-name { color: var(--jev); }
-  .phase { margin-left: auto; font-size: 16px; color: var(--muted); text-align: right; }
-  .clock {
-    font-variation-settings: "wdth" 125;
-    font-weight: 850;
-    font-size: 54px;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-    min-width: 250px;
-    text-align: right;
-  }
-  .lane.done .clock { color: var(--pass); }
-  .lane.jev.done .clock { color: var(--jev); }
+  .lane.llm { --accent: var(--llm); --soft: var(--llm-soft); --deep: var(--llm-deep); }
+  .lane.jev { --accent: var(--jev); --soft: var(--jev-soft); --deep: var(--jev-deep); }
 
-  .rows { position: relative; display: grid; grid-auto-rows: 1fr; padding: 4px 20px 6px 24px; }
-  .row { display: grid; grid-template-columns: var(--label-width) 1fr; align-items: center; gap: 12px; min-height: 0; }
-  .test-name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .track { position: relative; height: 100%; }
-  .track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--rule); }
-  .bar {
-    position: absolute; top: 22%; height: 56%; min-width: 3px; border-radius: 2px;
-    background: var(--idle);
-  }
-  .bar.running { background: repeating-linear-gradient(-45deg, var(--wait) 0 8px, #e8b54e 8px 16px); }
-  .bar.passed { background: var(--pass); }
-  .bar.failed { background: var(--fail); }
-  .bar.healed { background: var(--jev); }
-  .bar.retry { box-shadow: -3px 0 0 var(--panel); }
-  .note {
-    position: absolute; top: 50%; transform: translateY(-50%); padding-left: 10px;
-    font-size: 14px; font-weight: 600; white-space: nowrap;
-  }
-  .note.bug { color: var(--fail); }
-  .note.rerun { color: var(--wait); }
-  .note.heal { color: var(--jev); }
-  .note.fail { color: var(--fail); }
-  .note.flaky { color: var(--wait); }
+  .lane-head { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 12px; }
+  .engine { font-size: 15px; font-weight: 700; color: var(--deep); }
+  .lane-head h2 { margin: 2px 0 0; font-size: 30px; font-weight: 800; letter-spacing: -0.01em; }
+  .lane-head .sub { margin: 4px 0 0; color: var(--muted); font-size: 16px; }
+  .clock { font-size: 84px; line-height: 0.9; font-weight: 900; font-variation-settings: "wdth" 118; color: var(--deep); text-align: right; }
+  .clock small { display: block; font-size: 15px; font-weight: 600; color: var(--muted); font-variation-settings: "wdth" 100; line-height: 1.4; }
 
-  .axis { display: grid; grid-template-columns: var(--label-width) 1fr; gap: 12px; padding: 0 20px 0 24px; margin-left: 560px; font-size: 13px; color: var(--muted); }
-  .ticks { position: relative; height: 18px; }
-  .tick { position: absolute; transform: translateX(-50%); font-variant-numeric: tabular-nums; }
+  /* Where the time goes */
+  .split { display: grid; gap: 6px; }
+  .split-bar { display: flex; height: 34px; border-radius: 8px; overflow: hidden; background: var(--rule); }
+  .split-bar .work { background: var(--work); }
+  .split-bar .ai { background: repeating-linear-gradient(-45deg, var(--accent) 0 10px, var(--deep) 10px 20px); }
+  .split-legend { display: flex; gap: 22px; font-size: 16px; color: var(--muted); }
+  .split-legend b { color: var(--ink); }
+  .split-legend .dot { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 
-  .legend { display: flex; gap: 22px; font-size: 14px; color: var(--muted); padding-left: calc(560px + var(--label-width) + 44px); }
-  .legend span::before { content: ""; display: inline-block; width: 14px; height: 10px; margin-right: 6px; border-radius: 2px; vertical-align: 0; background: var(--swatch); }
+  /* Browser and live question */
+  .stage { display: grid; grid-template-columns: 560px 1fr; gap: 16px; align-items: start; }
+  .browser { border-radius: 10px; overflow: hidden; border: 3px solid var(--rule); background: #fff; transition: border-color 150ms, box-shadow 150ms; }
+  .browser .chrome { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; background: #f1eff7; font-size: 14px; color: var(--muted); }
+  .browser .chrome i { width: 10px; height: 10px; border-radius: 50%; background: var(--rule); }
+  .browser img { display: block; width: 554px; height: 297px; object-fit: cover; object-position: top left; background: #fff; }
+  .browser.thinking { border-color: var(--accent); box-shadow: 0 0 0 6px var(--soft); }
 
-  /* Title and end cards */
-  .card {
-    position: fixed; inset: 0; display: grid; place-items: center;
-    background: var(--fog);
-    transition: opacity 500ms ease;
-  }
-  .card[hidden] { display: none; }
-  .card .inner { width: min(1100px, 90vw); }
-  .card h2 { margin: 0 0 12px; font-size: 52px; line-height: 1.08; letter-spacing: -0.02em; font-weight: 800; }
-  .card .lede { margin: 0 0 32px; font-size: 24px; color: var(--muted); max-width: 60ch; line-height: 1.4; }
-  .breaks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 0; padding: 0; list-style: none; }
-  .breaks li { border-top: 4px solid var(--ink); padding-top: 12px; font-size: 20px; line-height: 1.35; }
-  .breaks b { display: block; font-size: 24px; margin-bottom: 4px; }
+  .ask { display: grid; align-content: start; gap: 10px; }
+  .ask .label { font-size: 15px; font-weight: 700; color: var(--muted); }
+  .bubble { border-radius: 12px; padding: 14px 16px; background: var(--soft); font-size: 19px; line-height: 1.35; min-height: 150px; }
+  .bubble .wait { margin-top: 12px; font-size: 48px; line-height: 1; font-weight: 900; font-variation-settings: "wdth" 115; color: var(--deep); }
+  .bubble .wait small { display: block; margin-top: 4px; font-size: 16px; font-weight: 600; color: var(--muted); font-variation-settings: "wdth" 100; }
+  .bubble.idle { background: #f6f5f9; color: var(--muted); }
+  .bubble.answered .wait { color: var(--work); }
 
-  .tally { width: 100%; border-collapse: collapse; font-size: 22px; }
-  .tally th, .tally td { padding: 14px 0; border-bottom: 1px solid var(--rule); text-align: right; }
-  .tally th:first-child, .tally td:first-child { text-align: left; color: var(--muted); font-weight: 400; }
-  .tally thead th { font-size: 18px; color: var(--muted); font-weight: 600; }
-  .tally thead th.jev { color: var(--jev); }
-  .tally td { font-variant-numeric: tabular-nums; font-weight: 600; }
-  .tally td.jev { color: var(--jev); }
-  .tally tr.hero td:not(:first-child) { font-size: 48px; font-weight: 850; font-variation-settings: "wdth" 115; }
-  .fine { margin: 18px 0 0; font-size: 15px; color: var(--muted); }
+  /* Test list */
+  .tests { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; align-content: start; min-height: 0; }
+  .test { display: grid; grid-template-columns: 24px 1fr auto auto; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; font-size: 16px; background: #f7f6fb; }
+  .test .icon { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 900; color: #fff; background: var(--rule); }
+  .test.running { background: var(--soft); }
+  .test.running .icon { background: var(--accent); animation: pulse 900ms ease-in-out infinite; }
+  .test.passed .icon { background: var(--work); }
+  .test.healed .icon { background: var(--jev); }
+  .test.failed .icon { background: var(--bug); }
+  .test .t { color: var(--muted); font-size: 14px; }
+  .test .tag { font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 99px; color: #fff; }
+  .test .tag.heal { background: var(--jev); }
+  .test .tag.bug { background: var(--bug); }
+  @keyframes pulse { 50% { transform: scale(0.8); } }
 
-  @media (prefers-reduced-motion: reduce) { .card { transition: none; } }
+  /* One bar per question, height is how long the answer took. Both lanes share the scale. */
+  .waits { display: grid; grid-template-rows: auto 1fr; gap: 6px; min-height: 0; }
+  .waits .label { font-size: 15px; font-weight: 700; color: var(--muted); }
+  .bars { position: relative; display: flex; align-items: flex-end; gap: 8px; min-height: 0; border-bottom: 2px solid var(--rule); padding-top: 22px; }
+  .bars .q { flex: 0 0 42px; position: relative; border-radius: 6px 6px 0 0; background: var(--accent); }
+  .bars .q.open { background: repeating-linear-gradient(-45deg, var(--accent) 0 8px, var(--deep) 8px 16px); }
+  .bars .q span { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); padding-bottom: 3px; font-size: 13px; font-weight: 700; color: var(--deep); white-space: nowrap; }
+  .bars .gridline { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--rule); font-size: 12px; color: var(--muted); }
+  .bars .gridline b { position: absolute; right: 0; top: -16px; font-weight: 600; }
+
+  .foot { color: var(--muted); font-size: 15px; }
+
+  /* Intro and end screens */
+  .screen { position: fixed; inset: 0; display: grid; place-items: center; background: var(--page); transition: opacity 600ms ease; padding: 40px; }
+  .screen[hidden] { display: none; }
+  .screen .inner { width: min(1500px, 92vw); }
+  .screen h2 { margin: 0; font-size: 64px; line-height: 1.02; font-weight: 900; letter-spacing: -0.025em; }
+  .screen .lede { margin: 18px 0 36px; font-size: 25px; line-height: 1.4; color: var(--muted); max-width: 62ch; }
+  .screen .lede b { color: var(--ink); }
+  .versus, .totals { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  .card { border-radius: 18px; padding: 26px 28px; background: var(--panel); border-top: 10px solid var(--accent); }
+  .card.llm { --accent: var(--llm); --deep: var(--llm-deep); }
+  .card.jev { --accent: var(--jev); --deep: var(--jev-deep); }
+  .card h3 { margin: 0 0 8px; font-size: 30px; font-weight: 800; color: var(--deep); }
+  .card p { margin: 0 0 18px; font-size: 20px; line-height: 1.4; }
+  .card .speed { font-size: 60px; line-height: 1; font-weight: 900; font-variation-settings: "wdth" 118; color: var(--deep); }
+  .card .speed small { font-size: 18px; font-weight: 600; color: var(--muted); font-variation-settings: "wdth" 100; }
+  .uses { margin: 30px 0 0; font-size: 21px; color: var(--muted); line-height: 1.45; }
+  .uses b { color: var(--ink); }
+  .card .big { font-size: 110px; line-height: 1; font-weight: 900; font-variation-settings: "wdth" 120; color: var(--deep); margin: 6px 0 16px; }
+  .card dl { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; margin: 0; font-size: 20px; }
+  .card dt { color: var(--muted); }
+  .card dd { margin: 0; font-weight: 700; text-align: right; }
+  .fine { margin: 22px 0 0; font-size: 16px; color: var(--muted); max-width: 120ch; line-height: 1.45; }
+
+  @media (prefers-reduced-motion: reduce) { .screen, .browser { transition: none; } .test.running .icon { animation: none; } }
 </style>
 </head>
 <body>
-<div class="frame">
-  <div class="headline">
-    <h1 id="headline">Same tests, same machine, two pipelines</h1>
-    <p id="subhead"></p>
+<div class="race">
+  <div class="top">
+    <h1>Same tests, same questions, two decision engines</h1>
+    <p id="topline"></p>
   </div>
 
-  <section class="lane standard" id="lane-standard" aria-label="Standard Playwright">
-    <div class="lane-head">
-      <div class="lane-name">Standard Playwright<small>Retries every failure twice</small></div>
-      <div class="phase" id="phase-standard">Waiting to start</div>
-      <div class="clock" id="clock-standard">0.0s</div>
-    </div>
-    <div class="lane-body">
-      <div class="browsers" id="browsers-standard"></div>
-      <div class="rows" id="rows-standard"></div>
-    </div>
-  </section>
+  <div class="lanes">
+    <section class="lane llm" id="lane-llm" aria-label="Playwright with an LLM">
+      <div class="lane-head">
+        <div>
+          <div class="engine" id="engine-llm"></div>
+          <h2>Playwright with an LLM</h2>
+          <p class="sub">Each question is a chat call that writes out its answer</p>
+        </div>
+        <div class="clock num" id="clock-llm">0.0s<small>total run time</small></div>
+      </div>
+      <div class="split" id="split-llm"></div>
+      <div class="stage">
+        <div class="browser" id="browser-llm"><div class="chrome"><i></i><i></i><i></i><span id="url-llm">Waiting to start</span></div><img alt="Live test browser" id="img-llm"></div>
+        <div class="ask"><div class="label">What the test is asking the AI</div><div class="bubble idle" id="ask-llm">No question yet</div></div>
+      </div>
+      <div class="tests" id="tests-llm"></div>
+      <div class="waits"><div class="label">How long each question waited for its answer</div><div class="bars" id="bars-llm"></div></div>
+    </section>
 
-  <section class="lane jev" id="lane-jev" aria-label="Playwright with JEV">
-    <div class="lane-head">
-      <div class="lane-name">Playwright with JEV<small>Heals renamed elements, reruns only what can pass</small></div>
-      <div class="phase" id="phase-jev">Waiting to start</div>
-      <div class="clock" id="clock-jev">0.0s</div>
-    </div>
-    <div class="lane-body">
-      <div class="browsers" id="browsers-jev"></div>
-      <div class="rows" id="rows-jev"></div>
-    </div>
-  </section>
+    <section class="lane jev" id="lane-jev" aria-label="Playwright with JEV">
+      <div class="lane-head">
+        <div>
+          <div class="engine" id="engine-jev"></div>
+          <h2>Playwright with JEV</h2>
+          <p class="sub">Each question is one typed decision</p>
+        </div>
+        <div class="clock num" id="clock-jev">0.0s<small>total run time</small></div>
+      </div>
+      <div class="split" id="split-jev"></div>
+      <div class="stage">
+        <div class="browser" id="browser-jev"><div class="chrome"><i></i><i></i><i></i><span id="url-jev">Waiting to start</span></div><img alt="Live test browser" id="img-jev"></div>
+        <div class="ask"><div class="label">What the test is asking the AI</div><div class="bubble idle" id="ask-jev">No question yet</div></div>
+      </div>
+      <div class="tests" id="tests-jev"></div>
+      <div class="waits"><div class="label">How long each question waited for its answer</div><div class="bars" id="bars-jev"></div></div>
+    </section>
+  </div>
 
-  <div>
-    <div class="axis"><span></span><div class="ticks" id="ticks"></div></div>
-    <div class="legend">
-      <span style="--swatch: var(--wait)">Waiting for the page</span>
-      <span style="--swatch: var(--pass)">Passed</span>
-      <span style="--swatch: var(--fail)">Failed</span>
-      <span style="--swatch: var(--jev)">Healed by JEV</span>
+  <div class="foot">Both lanes run the same 10 tests on the same shop release, one browser each, at the same time. Only the engine answering the questions differs.</div>
+</div>
+
+<div class="screen" id="intro">
+  <div class="inner">
+    <h2>We replaced the LLM calls in our tests with JEV.</h2>
+    <p class="lede">
+      AI-assisted Playwright suites ask small questions while they run: which button is this now, does this page look right, why did this
+      test fail. Usually a general LLM answers each one. <b>JEV is a fast decision engine</b> built for exactly these questions.
+    </p>
+    <div class="versus">
+      <div class="card llm">
+        <h3>LLM call</h3>
+        <p>A general language model reads the page and writes its answer out as text. Built for conversation and open-ended work.</p>
+        <div class="speed num" id="intro-llm-speed"></div>
+      </div>
+      <div class="card jev">
+        <h3>JEV decision</h3>
+        <p>A decision model reads the page and returns a typed answer with a probability: which element, yes or no, which cause.</p>
+        <div class="speed num">0.3 s<small> per question, measured</small></div>
+      </div>
     </div>
+    <p class="uses" id="intro-uses"></p>
   </div>
 </div>
 
-<div class="card" id="title-card">
-  <div class="inner" id="title-inner"></div>
-</div>
-
-<div class="card" id="end-card" hidden>
+<div class="screen" id="end" hidden>
   <div class="inner">
     <h2 id="end-title">Results</h2>
     <p class="lede" id="end-lede"></p>
-    <table class="tally">
-      <thead><tr><th></th><th>Standard Playwright</th><th class="jev">Playwright with JEV</th></tr></thead>
-      <tbody id="tally"></tbody>
-    </table>
+    <div class="totals">
+      <div class="card llm"><h3>Playwright with an LLM</h3><div class="big num" id="end-llm-time"></div><dl id="end-llm"></dl></div>
+      <div class="card jev"><h3>Playwright with JEV</h3><div class="big num" id="end-jev-time"></div><dl id="end-jev"></dl></div>
+    </div>
     <p class="fine" id="fine"></p>
   </div>
 </div>
@@ -188,263 +218,263 @@
 <script>
   const params = new URLSearchParams(location.search)
   const release = params.get("release") ?? "v2"
-  const provider = params.get("provider") ?? "openrouter"
-  const lanes = ["standard", "jev"]
-  const state = {
-    startAt: null,
-    doneAt: {},
-    phase: {},
-    tests: [],
-    rows: { standard: new Map(), jev: new Map() },
-    decisions: [],
-    triage: new Map(),
+  const jevProvider = params.get("provider") ?? "openrouter"
+  const llmModel = params.get("llm") ?? "anthropic/claude-sonnet-4.6"
+  const lanes = ["llm", "jev"]
+
+  const labels = {
+    "home shows featured products": "Home page",
+    "header links to the cart": "Cart link",
+    "product page shows the price": "Product price",
+    "add to cart updates the cart badge": "Add to cart",
+    "cart lists every line item": "Cart items",
+    "cart total adds up all line items": "Cart total",
+    "coupon code can be applied": "Coupon code",
+    "checkout opens the payment page": "Checkout",
+    "search finds products": "Search",
+    "footer links to contact": "Contact link",
   }
 
-  // Title card copy depends on the release being tested.
-  const titleInner = document.getElementById("title-inner")
-  titleInner.innerHTML =
-    release === "v2"
-      ? `<h2>Release 2 just shipped.<br>Three things changed.</h2>
-         <p class="lede">Both pipelines run the same 10 end-to-end tests against the new release, at the same time, with 4 parallel workers each.</p>
-         <ul class="breaks">
-           <li><b>A button was renamed</b>"Checkout" is now "Go to checkout". The test is out of date, the shop works.</li>
-           <li><b>The cart total is wrong</b>A real bug: the total skips the last item. Someone needs to fix the shop.</li>
-           <li><b>Search is slow once</b>The first search after a release waits on a cold cache. Trying again works.</li>
-         </ul>`
-      : `<h2>Release 1: nothing is broken.</h2>
-         <p class="lede">Both pipelines run the same 10 end-to-end tests at the same time. This round checks that JEV adds no delay when every test passes.</p>`
-
-  document.getElementById("subhead").textContent =
-    release === "v2" ? "Release 2: a renamed button, a cart bug, a slow first search" : "Release 1: control round, nothing broken"
-
-  function seconds(ms) {
-    return `${(ms / 1000).toFixed(1)}s`
+  function friendlyModel(id) {
+    const name = id.split("/").at(-1).replace(/-(\d)/g, " $1").replace(/-/g, " ")
+    return name.replace(/\b[a-z]/g, (letter) => letter.toUpperCase()).replace(/^Gpt/, "GPT")
   }
 
-  const tiles = { standard: [], jev: [] }
+  document.getElementById("engine-llm").textContent = `${friendlyModel(llmModel)} via OpenRouter`
+  document.getElementById("engine-jev").textContent = `JEV via ${jevProvider === "typesafe" ? "TypeSafe" : "OpenRouter"}`
+  document.getElementById("topline").textContent =
+    release === "v2" ? "Release 2: four renamed controls and a cart bug" : "Release 1: nothing broken"
+  document.getElementById("intro-uses").innerHTML =
+    "In this race the AI <b>finds renamed buttons</b>, <b>checks what each page shows</b>, and <b>explains why a test failed</b>. " +
+    (release === "v2" ? "Release 2 of the shop renamed four controls and broke the cart total." : "Release 1 of the shop has no problems.")
+
+  // Typical wait per question, measured before recording on the pages in this demo.
+  const typicalLlm = { "anthropic/claude-sonnet-4.6": "1.3 s", "openai/gpt-4.1-mini": "1.3 s", "anthropic/claude-haiku-4.5": "2.1 s" }
+  document.getElementById("intro-llm-speed").innerHTML = typicalLlm[llmModel]
+    ? `${typicalLlm[llmModel]}<small> per question, measured</small>`
+    : `Slower<small> per question</small>`
+
+  const state = { startAt: null, lanes: {} }
   for (const lane of lanes) {
-    const grid = document.getElementById(`browsers-${lane}`)
-    for (let worker = 0; worker < 4; worker++) {
-      const tile = document.createElement("div")
-      tile.className = "browser"
-      tile.innerHTML = `<div class="bar-top">Worker ${worker + 1} idle</div><img alt=""><div class="stamp" hidden></div>`
-      grid.append(tile)
-      tiles[lane].push({ el: tile, bar: tile.querySelector(".bar-top"), img: tile.querySelector("img"), stamp: tile.querySelector(".stamp"), title: null, since: 0 })
+    state.lanes[lane] = { doneAt: null, tests: new Map(), decisions: [], open: new Map(), aiMs: 0, lastAnswer: null }
+  }
+
+  function seconds(ms, digits = 1) {
+    return `${(ms / 1000).toFixed(digits)}s`
+  }
+
+  function buildTests(lane, titles) {
+    const container = document.getElementById(`tests-${lane}`)
+    container.innerHTML = ""
+    for (const title of titles) {
+      const row = document.createElement("div")
+      row.className = "test"
+      row.innerHTML = `<span class="icon"></span><span class="name"></span><span class="tagslot"></span><span class="t num"></span>`
+      row.querySelector(".name").textContent = labels[title] ?? title
+      container.append(row)
+      state.lanes[lane].tests.set(title, { row, start: null, status: "queued" })
     }
   }
 
-  function showFrame(event) {
-    const tile = tiles[event.lane]?.[event.worker]
-    if (!tile) return
-    tile.img.src = `data:image/jpeg;base64,${event.data}`
-    if (tile.title !== event.title) {
-      tile.title = event.title
-      tile.since = Date.now()
-      tile.stamp.hidden = true
+  function setTest(lane, title, status, extra = {}) {
+    const test = state.lanes[lane].tests.get(title)
+    if (!test) return
+    Object.assign(test, { status }, extra)
+    test.row.className = `test ${status}`
+    test.row.querySelector(".icon").textContent = { passed: "✓", healed: "✓", failed: "✕" }[status] ?? ""
+    const slot = test.row.querySelector(".tagslot")
+    slot.innerHTML = ""
+    if (extra.tag) {
+      const tag = document.createElement("span")
+      tag.className = `tag ${extra.tagKind}`
+      tag.textContent = extra.tag
+      slot.append(tag)
     }
   }
 
-  function tileFor(lane, title) {
-    return tiles[lane].find((tile) => tile.title === title)
-  }
-
-  function buildRows() {
-    for (const lane of lanes) {
-      const container = document.getElementById(`rows-${lane}`)
-      container.innerHTML = ""
-      for (const title of state.tests) {
-        const row = document.createElement("div")
-        row.className = "row"
-        row.innerHTML = `<div class="test-name"></div><div class="track"></div>`
-        row.querySelector(".test-name").textContent = title
-        container.append(row)
-        state.rows[lane].set(title, { track: row.querySelector(".track"), attempts: [], note: null })
-      }
+  function describeQuestion(decision) {
+    const question = decision.question ?? {}
+    if (decision.feature === "locator-healing") {
+      const original = question.original ?? {}
+      const name = original.name ?? original.label ?? original.text ?? "the element"
+      return `The ${original.role ?? "control"} “${name}” is gone. Which element on the page is it now?`
     }
-  }
-
-  function row(lane, title) {
-    if (!state.rows[lane].has(title)) {
-      state.tests.push(title)
-      buildRows()
-    }
-    return state.rows[lane].get(title)
-  }
-
-  function setNote(entry, text, kind) {
-    entry.note = { text, kind }
+    if (decision.feature === "assertion") return `Does the page show this? “${question.claim}”`
+    if (decision.feature === "triage") return "This test failed. Why? A renamed element, a slow page, or a real bug?"
+    return "Deciding"
   }
 
   function handle(event) {
+    const laneState = state.lanes[event.lane]
     switch (event.type) {
       case "frame":
-        showFrame(event)
+        if (laneState) document.getElementById(`img-${event.lane}`).src = `data:image/jpeg;base64,${event.data}`
         return
       case "start":
         state.startAt = event.at
-        document.getElementById("title-card").style.opacity = "0"
-        setTimeout(() => document.getElementById("title-card").hidden = true, 500)
+        document.getElementById("intro").style.opacity = "0"
+        setTimeout(() => (document.getElementById("intro").hidden = true), 600)
         break
       case "suite":
-        if (state.tests.length === 0) {
-          state.tests = event.tests.map((test) => test.title)
-          buildRows()
-        }
+        if (laneState.tests.size === 0) buildTests(event.lane, event.tests.map((test) => test.title))
         break
-      case "phase":
-        state.phase[event.lane] = event.label
+      case "test-begin":
+        setTest(event.lane, event.title, "running", { start: event.at })
+        document.getElementById(`url-${event.lane}`).textContent = `Testing: ${labels[event.title] ?? event.title}`
         break
-      case "test-begin": {
-        const entry = row(event.lane, event.title)
-        entry.attempts.push({ start: event.at, end: null, status: "running", retry: entry.attempts.length > 0 })
-        break
-      }
       case "test-end": {
-        const entry = row(event.lane, event.title)
-        const attempt = [...entry.attempts].reverse().find((item) => item.end === null)
-        if (!attempt) break
-        attempt.end = event.at
         const healed = event.healed?.length > 0
-        attempt.status = event.ok ? (healed ? "healed" : "passed") : "failed"
-        const tile = tileFor(event.lane, event.title)
-        if (tile) {
-          tile.stamp.hidden = !(healed || !event.ok)
-          tile.stamp.className = `stamp${healed ? " heal" : ""}`
-          tile.stamp.textContent = healed ? "Healed" : `Failed after ${seconds(event.durationMs)}`
-        }
-        const count = entry.attempts.length
-        if (event.ok && healed) setNote(entry, `Healed: button renamed to "${event.healed[0].element?.match(/"(.+)"/)?.[1] ?? "?"}"`, "heal")
-        else if (event.ok && count > 1) setNote(entry, event.lane === "jev" ? "Passed on the targeted rerun" : `Passed on retry ${count - 1}`, "flaky")
-        else if (!event.ok && event.lane === "standard" && count >= 3) setNote(entry, `Failed ${count}×`, "fail")
+        const status = event.ok ? (healed ? "healed" : "passed") : "failed"
+        const tag = healed ? "Healed" : event.ok ? null : "Bug found"
+        setTest(event.lane, event.title, status, { tag, tagKind: healed ? "heal" : "bug" })
+        const test = laneState.tests.get(event.title)
+        if (test) test.row.querySelector(".t").textContent = seconds(event.durationMs)
         break
       }
-      case "triage":
-        for (const result of event.results) {
-          const title = result.title.split(" > ").at(-1)
-          const entry = row("jev", title)
-          if (result.retry.recommended) setNote(entry, `JEV: ${label(result.category)}, so rerun it`, "rerun")
-          else if (result.heal.recommended) setNote(entry, `JEV: ${label(result.category)}, so update the test`, "heal")
-          else setNote(entry, `JEV: ${label(result.category)}, sent to a person`, "bug")
-          state.triage.set(title, result)
-        }
+      case "decision-start":
+        laneState.open.set(event.id, { ...event, startedAt: Date.now() })
+        laneState.lastAnswer = null
         break
-      case "decision":
-        state.decisions.push(event)
+      case "decision-end": {
+        const open = laneState.open.get(event.id) ?? {}
+        laneState.open.delete(event.id)
+        laneState.aiMs += event.latencyMs
+        const decision = { ...open, ...event }
+        laneState.decisions.push(decision)
+        laneState.lastAnswer = { ...decision, shownAt: Date.now() }
         break
+      }
       case "lane-done":
-        state.doneAt[event.lane] = event.at
-        document.getElementById(`lane-${event.lane}`).classList.add("done")
-        state.phase[event.lane] = "Final answer ready"
+        laneState.doneAt = event.at
+        document.getElementById(`url-${event.lane}`).textContent = "Finished"
         break
       case "finish":
-        setTimeout(showEndCard, 1500)
+        setTimeout(showEnd, 2500)
         break
     }
   }
 
-  function label(category) {
-    return {
-      app_bug: "app bug",
-      locator_drift: "renamed element",
-      timing: "slow page",
-      environment: "infrastructure",
-      test_data: "test data",
-      assertion_outdated: "outdated check",
-    }[category] ?? category
+  function renderBubble(lane, now) {
+    const laneState = state.lanes[lane]
+    const bubble = document.getElementById(`ask-${lane}`)
+    const open = [...laneState.open.values()].at(-1)
+    document.getElementById(`browser-${lane}`).classList.toggle("thinking", Boolean(open))
+    const last = laneState.lastAnswer
+    const shown = open ?? (last && now - last.shownAt < 1800 ? last : null)
+    if (!shown) {
+      bubble.className = "bubble idle"
+      bubble.textContent = laneState.doneAt ? `Done. ${laneState.decisions.length} questions answered.` : "Running test steps"
+      return
+    }
+    bubble.className = open ? "bubble" : "bubble answered"
+    bubble.innerHTML = `<div class="q"></div><div class="wait num"></div>`
+    bubble.querySelector(".q").textContent = describeQuestion(shown)
+    bubble.querySelector(".wait").innerHTML = open
+      ? `${seconds(now - open.startedAt)}<small>waiting for the answer</small>`
+      : `${seconds(last.latencyMs)}<small>answered</small>`
+  }
+
+  function renderSplit(lane, now) {
+    const laneState = state.lanes[lane]
+    const total = state.startAt === null ? 0 : (laneState.doneAt ?? now) - state.startAt
+    const openMs = laneState.doneAt ? 0 : [...laneState.open.values()].reduce((sum, open) => sum + (now - open.startedAt), 0)
+    const ai = Math.min(total, laneState.aiMs + openMs)
+    const work = Math.max(0, total - ai)
+    document.getElementById(`split-${lane}`).innerHTML = `
+      <div class="split-bar"><div class="work" style="flex-grow:${work}"></div><div class="ai" style="flex-grow:${ai}"></div></div>
+      <div class="split-legend num">
+        <span><i class="dot" style="background:var(--work)"></i>Testing <b>${seconds(work)}</b></span>
+        <span><i class="dot" style="background:var(--${lane})"></i>Waiting on AI <b>${seconds(ai)}</b></span>
+        <span>${laneState.decisions.length + laneState.open.size} questions asked</span>
+      </div>`
+  }
+
+  const barScaleMs = 2500
+
+  function renderBars(lane, now) {
+    const laneState = state.lanes[lane]
+    const container = document.getElementById(`bars-${lane}`)
+    const height = container.clientHeight - 22
+    const px = (ms) => Math.max(3, Math.min(1, ms / barScaleMs) * height)
+    const done = laneState.decisions.map((decision) => ({ ms: decision.latencyMs, open: false }))
+    const open = [...laneState.open.values()].map((decision) => ({ ms: now - decision.startedAt, open: true }))
+    const lines = [1000, 2000]
+      .map((ms) => `<div class="gridline" style="bottom:${px(ms)}px"><b>${ms / 1000} s</b></div>`)
+      .join("")
+    container.innerHTML =
+      lines +
+      [...done, ...open]
+        .map((bar) => `<div class="q${bar.open ? " open" : ""}" style="height:${px(bar.ms)}px"><span>${(bar.ms / 1000).toFixed(1)}</span></div>`)
+        .join("")
   }
 
   function render() {
     const now = Date.now()
-    const total = Math.max(20_000, ...lanes.map((lane) => (state.doneAt[lane] ?? now) - (state.startAt ?? now))) * 1.04
     for (const lane of lanes) {
-      const end = state.doneAt[lane] ?? now
-      document.getElementById(`clock-${lane}`).textContent = seconds(state.startAt === null ? 0 : end - state.startAt)
-      document.getElementById(`phase-${lane}`).textContent = state.phase[lane] ?? "Waiting to start"
-      for (const entry of state.rows[lane].values()) {
-        const bars = entry.attempts.map((attempt) => {
-          const left = ((attempt.start - state.startAt) / total) * 100
-          const width = Math.max(0.3, (((attempt.end ?? now) - attempt.start) / total) * 100)
-          return `<div class="bar ${attempt.status}${attempt.retry ? " retry" : ""}" style="left:${left}%;width:${width}%"></div>`
-        })
-        const last = entry.attempts.at(-1)
-        const furthest = Math.max(...entry.attempts.map((attempt) => attempt.end ?? now))
-        const noteLeft = last ? ((furthest - state.startAt) / total) * 100 : 0
-        const note = entry.note && last?.end
-          ? `<div class="note ${entry.note.kind}" style="left:${noteLeft}%"></div>`
-          : ""
-        entry.track.innerHTML = bars.join("") + note
-        if (note) entry.track.querySelector(".note").textContent = entry.note.text
+      const laneState = state.lanes[lane]
+      const clock = document.getElementById(`clock-${lane}`)
+      clock.firstChild.textContent = seconds(state.startAt === null ? 0 : (laneState.doneAt ?? now) - state.startAt)
+      renderBubble(lane, now)
+      renderSplit(lane, now)
+      renderBars(lane, now)
+      for (const test of laneState.tests.values()) {
+        if (test.status === "running") test.row.querySelector(".t").textContent = seconds(now - test.start)
       }
     }
-    for (const lane of lanes) {
-      for (const tile of tiles[lane]) {
-        const entry = tile.title && state.rows[lane].get(tile.title)
-        const running = entry?.attempts.at(-1)?.end === null
-        const waited = running ? now - entry.attempts.at(-1).start : 0
-        tile.el.classList.toggle("running", running && waited < 8_000)
-        tile.el.classList.toggle("stuck", running && waited >= 8_000)
-        if (!tile.title) continue
-        const retry = entry ? entry.attempts.length - 1 : 0
-        tile.bar.textContent = running
-          ? `${tile.title}${retry ? ` (retry ${retry})` : ""}, waiting ${seconds(waited)}`
-          : tile.title
-      }
-    }
-    const step = total > 90_000 ? 20_000 : total > 45_000 ? 10_000 : 5_000
-    const ticks = []
-    for (let t = 0; t <= total; t += step) ticks.push(`<span class="tick" style="left:${(t / total) * 100}%">${t / 1000}s</span>`)
-    document.getElementById("ticks").innerHTML = ticks.join("")
     requestAnimationFrame(render)
   }
 
-  function laneStats(lane) {
-    const entries = [...state.rows[lane].values()]
-    const attempts = entries.reduce((sum, entry) => sum + entry.attempts.length, 0)
-    const reruns = attempts - entries.length
-    const failed = entries.filter((entry) => entry.attempts.at(-1)?.status === "failed").length
-    return { ms: state.doneAt[lane] - state.startAt, attempts, reruns, failed }
+  function stats(lane) {
+    const laneState = state.lanes[lane]
+    const decisions = laneState.decisions
+    const priced = decisions.filter((decision) => typeof decision.costUsd === "number")
+    const tests = [...laneState.tests.values()]
+    return {
+      total: laneState.doneAt - state.startAt,
+      ai: laneState.aiMs,
+      count: decisions.length,
+      avg: decisions.length ? laneState.aiMs / decisions.length : 0,
+      cost: priced.length ? priced.reduce((sum, decision) => sum + decision.costUsd, 0) : null,
+      passed: tests.filter((test) => test.status === "passed" || test.status === "healed").length,
+      healed: tests.filter((test) => test.status === "healed").length,
+      bugs: tests.filter((test) => test.status === "failed").length,
+    }
   }
 
-  function showEndCard() {
-    const standard = laneStats("standard")
-    const jev = laneStats("jev")
-    const ratio = standard.ms / jev.ms
-    const priced = state.decisions.filter((decision) => typeof decision.costUsd === "number")
-    const cost = priced.reduce((sum, decision) => sum + decision.costUsd, 0)
-    const avgLatency = state.decisions.length
-      ? Math.round(state.decisions.reduce((sum, decision) => sum + decision.latencyMs, 0) / state.decisions.length)
-      : 0
-    const bugs = [...state.triage.values()].filter((result) => !result.retry.recommended && !result.heal.recommended)
-
+  function showEnd() {
+    const llm = stats("llm")
+    const jev = stats("jev")
+    const money = (value) => (value === null ? "not reported" : `$${value.toFixed(value < 0.01 ? 4 : 3)}`)
+    const same = llm.passed === jev.passed && llm.bugs === jev.bugs
+    const waitRatio = llm.ai / jev.ai
     document.getElementById("end-title").textContent =
-      release === "v2" && ratio >= 1.5
-        ? `A trustworthy answer ${ratio.toFixed(ratio >= 10 ? 0 : 1)}× sooner`
-        : "No difference when nothing breaks"
-    document.getElementById("end-lede").textContent =
-      release === "v2"
-        ? `Standard Playwright waited out timeouts and retried a real bug. JEV healed the renamed button, reran only the slow search, and flagged ${bugs.length === 1 ? "the cart bug" : `${bugs.length} bug(s)`} for a person.`
-        : "When every test passes, JEV makes no calls and both pipelines finish together."
-
-    const rows = [
-      ["Time to a final answer", seconds(standard.ms), seconds(jev.ms), "hero"],
-      ["Test attempts", standard.attempts, jev.attempts],
-      ["Reruns", standard.reruns, jev.reruns],
-      ["Tests left failing", standard.failed, jev.failed],
-      ["Failures sent on to an AI healer", standard.failed, 0],
-      ["JEV decisions made", "none", state.decisions.length ? `${state.decisions.length}, about ${avgLatency} ms each` : "none needed"],
-      ["JEV cost for this run", "none", !state.decisions.length ? "$0" : priced.length ? `$${cost.toFixed(4)}` : "not reported"],
-    ]
-    document.getElementById("tally").innerHTML = rows
-      .map(([name, a, b, kind]) => `<tr class="${kind ?? ""}"><td>${name}</td><td>${a}</td><td class="jev">${b}</td></tr>`)
-      .join("")
+      `${same ? "Same results. " : ""}${waitRatio.toFixed(0)}× less waiting on AI.`
+    document.getElementById("end-lede").innerHTML =
+      (same
+        ? `Both lanes healed ${jev.healed} renamed controls and caught the same cart bug. `
+        : `The LLM lane passed ${llm.passed} tests, the JEV lane ${jev.passed}. `) +
+      `The test steps took about the same time in both, ${seconds(llm.total - llm.ai)} and ${seconds(jev.total - jev.ai)}. ` +
+      `The difference is the wait for AI answers: <b>${seconds(llm.avg, 2)} per question for the LLM, ${seconds(jev.avg, 2)} for JEV</b>. ` +
+      `That makes the whole run <b>${(llm.total / jev.total).toFixed(1)}× faster</b>, and the more questions a suite asks, the bigger the gap.`
+    const rows = (s) => `
+      <dt>Waiting on AI</dt><dd class="num">${seconds(s.ai)}</dd>
+      <dt>Average per question</dt><dd class="num">${seconds(s.avg, 2)}</dd>
+      <dt>Questions asked</dt><dd class="num">${s.count}</dd>
+      <dt>Tests passed, including healed</dt><dd class="num">${s.passed} of 10</dd>
+      <dt>Real bugs caught</dt><dd class="num">${s.bugs}</dd>
+      <dt>AI cost for this run</dt><dd class="num">${money(s.cost)}</dd>`
+    document.getElementById("end-llm-time").textContent = seconds(llm.total)
+    document.getElementById("end-jev-time").textContent = seconds(jev.total)
+    document.getElementById("end-llm").innerHTML = rows(llm)
+    document.getElementById("end-jev").innerHTML = rows(jev)
     document.getElementById("fine").textContent =
-      `Measured live on one laptop with ${provider === "typesafe" ? "TypeSafe" : "OpenRouter"} JEV and no decision cache. ` +
-      "Standard Playwright uses the retries: 2 setting Playwright generates for CI." +
-      (jev.failed ? " The failing test left in the JEV lane is the real cart bug." : "")
-    const card = document.getElementById("end-card")
-    card.hidden = false
-    card.style.opacity = "0"
-    requestAnimationFrame(() => (card.style.opacity = "1"))
+      `Measured live on one laptop with no caching. Left: ${friendlyModel(llmModel)} through OpenRouter chat completions. ` +
+      `Right: JEV through ${jevProvider === "typesafe" ? "TypeSafe" : "OpenRouter"}. Both engines get identical questions and page data, ` +
+      "and both lanes use the same thresholds and timeouts."
+    const screen = document.getElementById("end")
+    screen.hidden = false
+    screen.style.opacity = "0"
+    requestAnimationFrame(() => (screen.style.opacity = "1"))
   }
 
   const stream = new EventSource("/stream")

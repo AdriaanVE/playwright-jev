@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// Runs the same Playwright suite twice, side by side: standard Playwright and playwright-jev. A dashboard
-// shows both lanes live, and `--record` saves it as a video for sharing.
+// Runs the same AI-assisted Playwright suite twice, side by side. Both lanes heal renamed elements, check
+// pages against plain-language claims, and triage failures. The left lane asks a general LLM each question;
+// the right lane asks JEV. A dashboard shows both lanes live, and `--record` saves it as a video.
 //
-//   node demo/race.mjs                 open the dashboard and race after v2 ships
-//   node demo/race.mjs --record        also save demo/output/race.webm (and .mp4 when ffmpeg exists)
-//   node demo/race.mjs --release v1    control round: nothing is broken, both lanes should tie
-//   node demo/race.mjs --headless      no visible window (CI, smoke tests)
+//   node demo/race.mjs                    open the dashboard and race after release 2 ships
+//   node demo/race.mjs --record           also save demo/output/race.webm (and .mp4 when ffmpeg exists)
+//   node demo/race.mjs --headless         no visible window
+//   node demo/race.mjs --llm openai/gpt-4.1-mini   compare against another LLM on OpenRouter
 import { spawn, spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs"
 import http from "node:http"
@@ -13,6 +14,7 @@ import path from "node:path"
 import { parseArgs } from "node:util"
 import { chromium } from "@playwright/test"
 import { startShop } from "./app/shop.mjs"
+import { defaultLlmModel } from "./llm-provider.mjs"
 
 const here = import.meta.dirname
 const root = path.resolve(here, "..")
@@ -24,14 +26,17 @@ const { values: args } = parseArgs({
     record: { type: "boolean", default: false },
     headless: { type: "boolean", default: false },
     provider: { type: "string", default: "openrouter" },
-    "hold-ms": { type: "string", default: "12000" },
+    llm: { type: "string", default: defaultLlmModel },
+    "hold-ms": { type: "string", default: "14000" },
   },
 })
 
-const keyVariable = args.provider === "typesafe" ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY"
-if (!process.env[keyVariable]) {
-  console.error(`${keyVariable} is not set. The JEV lane calls the live API.`)
-  process.exit(1)
+const required = ["OPENROUTER_API_KEY", ...(args.provider === "typesafe" ? ["TYPESAFE_API_KEY"] : [])]
+for (const variable of required) {
+  if (!process.env[variable]) {
+    console.error(`${variable} is not set. Both lanes call live APIs.`)
+    process.exit(1)
+  }
 }
 if (!existsSync(path.join(root, "dist", "index.js"))) {
   console.error("playwright-jev is not built. Run `npm run build` first.")
@@ -52,8 +57,7 @@ function publish(event) {
 }
 
 const dashboardHtml = readFileSync(path.join(here, "dashboard.html"), "utf8")
-// Latest screencast frame per lane and worker. Frames skip the history so late joiners get no backlog.
-const frames = new Map()
+// Screencast frames go straight to connected clients and skip the history, so late joiners get no backlog.
 const hub = http.createServer((request, response) => {
   if (request.method === "POST" && request.url === "/events/frame") {
     let body = ""
@@ -63,7 +67,6 @@ const hub = http.createServer((request, response) => {
     request.on("end", () => {
       try {
         const frame = JSON.parse(body)
-        frames.set(`${frame.lane}:${frame.worker}`, frame)
         const line = `data: ${JSON.stringify({ type: "frame", ...frame })}\n\n`
         for (const client of clients) client.write(line)
       } catch {
@@ -101,9 +104,9 @@ const hub = http.createServer((request, response) => {
 const hubPort = await listen(hub)
 const eventsUrl = `http://127.0.0.1:${hubPort}/events`
 
-// Each lane gets its own copy of the shop, so the one-time slow search hits both lanes equally.
+// Each lane gets its own copy of the shop.
 const shops = {
-  standard: await startShop({ port: 0, release: args.release }),
+  llm: await startShop({ port: 0, release: args.release }),
   jev: await startShop({ port: 0, release: args.release }),
 }
 const baseUrl = (lane) => `http://127.0.0.1:${shops[lane].address().port}`
@@ -115,12 +118,13 @@ const context = await browser.newContext({
   ...(args.record ? { recordVideo: { dir: output, size: { width: 1920, height: 1080 } } } : {}),
 })
 const dashboard = await context.newPage()
-await dashboard.goto(`http://127.0.0.1:${hubPort}/?release=${args.release}&provider=${args.provider}`)
+const query = new URLSearchParams({ release: args.release, provider: args.provider, llm: args.llm })
+await dashboard.goto(`http://127.0.0.1:${hubPort}/?${query}`)
 await dashboard.waitForFunction(() => window.dashboardReady === true)
-await dashboard.waitForTimeout(2_500) // Title card.
+await dashboard.waitForTimeout(9_000) // Intro: what JEV is and what the race shows.
 
 publish({ type: "start", release: args.release })
-const results = await Promise.all([runStandard(), runJev()])
+const results = await Promise.all([runLane("llm"), runLane("jev")])
 publish({ type: "finish", results })
 console.log(results.map((result) => `${result.lane}: ${(result.ms / 1000).toFixed(1)}s`).join("  "))
 
@@ -132,64 +136,35 @@ if (video) finishVideo(await video.path())
 for (const server of [hub, ...Object.values(shops)]) server.close()
 process.exit(0)
 
-async function runStandard() {
+async function runLane(lane) {
   const started = Date.now()
-  publish({ type: "phase", lane: "standard", phase: "run", label: "Running the suite, with retries: 2" })
-  await playwright("standard", "playwright.standard.config.ts", [])
-  publish({ type: "lane-done", lane: "standard" })
-  return { lane: "standard", ms: Date.now() - started }
+  await playwright(lane)
+  publish({ type: "lane-done", lane })
+  return { lane, ms: Date.now() - started }
 }
 
-async function runJev() {
-  const started = Date.now()
-  publish({ type: "phase", lane: "jev", phase: "run", label: "Running the suite, JEV triages failures" })
-  await playwright("jev", "playwright.jev.config.ts", [])
-  const retryFile = path.join(output, "jev", "playwright-jev", "retry.json")
-  const triage = readJson(path.join(output, "jev", "playwright-jev", "triage.json"))
-  publish({ type: "triage", lane: "jev", results: triage?.results ?? [] })
-  const rerun = readJson(retryFile)?.failedTests ?? []
-  if (rerun.length) {
-    publish({
-      type: "phase",
-      lane: "jev",
-      phase: "retry",
-      label: `Rerunning ${rerun.length} transient failure(s) only`,
-    })
-    await playwright("jev", "playwright.jev.config.ts", ["--last-failed", "--last-failed-file", retryFile], "retry")
-  }
-  publish({ type: "lane-done", lane: "jev" })
-  return { lane: "jev", ms: Date.now() - started }
-}
-
-function playwright(lane, config, extra, phase = "run") {
+function playwright(lane) {
   return new Promise((resolve) => {
     const child = spawn(
       process.execPath,
-      [path.join(root, "node_modules", "@playwright", "test", "cli.js"), "test", "-c", config, ...extra],
+      [path.join(root, "node_modules", "@playwright", "test", "cli.js"), "test", "-c", "playwright.config.ts"],
       {
         cwd: here,
         stdio: ["ignore", "ignore", "inherit"],
         env: {
           ...process.env,
           DEMO_LANE: lane,
-          DEMO_PHASE: phase,
+          DEMO_RELEASE: args.release,
           DEMO_BASE_URL: baseUrl(lane),
           DEMO_EVENTS_URL: eventsUrl,
-          DEMO_PROVIDER: args.provider,
+          DEMO_JEV_PROVIDER: args.provider,
+          DEMO_LLM_MODEL: args.llm,
           PLAYWRIGHT_JEV_CONFIG: path.join(here, "playwright-jev.config.mjs"),
         },
       },
     )
     child.on("exit", resolve)
   })
-}
-
-function readJson(file) {
-  try {
-    return JSON.parse(readFileSync(file, "utf8"))
-  } catch {
-    return undefined
-  }
 }
 
 function listen(server) {

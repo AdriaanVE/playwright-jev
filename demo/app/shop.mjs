@@ -1,7 +1,11 @@
-// Small shop used by the demo. `release: "v2"` ships three problems a real release could introduce:
-// a renamed checkout button, a cart total that drops the last line item, and a slow first search
-// while the search cache is cold.
+// Small shop used by the demo. Release v2 ships the changes listed in scenario.json: four renamed or
+// restructured controls and a cart total that drops the last line item.
+// Pages are laid out for a 560 by 300 viewport, so every control is visible in the dashboard tiles.
+import { readFileSync } from "node:fs"
 import http from "node:http"
+import path from "node:path"
+
+export const scenario = JSON.parse(readFileSync(path.join(import.meta.dirname, "scenario.json"), "utf8"))
 
 const products = {
   apple: { name: "Apple", price: 2.5 },
@@ -11,72 +15,76 @@ const products = {
 
 const euro = (value) => `€${value.toFixed(2)}`
 
-function layout(title, body) {
-  return `<!doctype html>
+export function startShop({ port, release }) {
+  const changes = scenario.releases[release]?.changes ?? []
+  const has = (kind) => changes.some((change) => change.kind === kind)
+  // UI copy for this release: renamed controls use their new text.
+  const copy = (before) =>
+    changes.find((change) => change.kind === "renamed" && change.before === before)?.after ?? before
+
+  const contact =
+    copy("Contact us") === "Contact us"
+      ? `<a href="/contact">Contact us</a>`
+      : `<button type="button" class="linkish" onclick="location.href='/contact'">${copy("Contact us")}</button>`
+
+  const layout = (title, body) => `<!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>${title} · Fresh Market</title>
 <style>
-  body { font-family: system-ui, sans-serif; margin: 0; color: #1d2433; font-size: 20px; }
-  header, footer { display: flex; gap: 16px; padding: 8px 16px; background: #1f7a4d; }
-  header a, footer a { color: #fff; }
-  main { padding: 8px 16px; }
-  h1 { margin: 4px 0 8px; font-size: 28px; }
-  ul { margin: 4px 0; }
-  button { font-size: 20px; padding: 6px 14px; border-radius: 6px; border: 0; background: #1f7a4d; color: #fff; }
-  input { font-size: 18px; padding: 4px 8px; }
-  [role=status] { font-weight: 700; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin: 0; color: #1d2433; font-size: 18px; height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
+  header, footer { display: flex; gap: 16px; align-items: center; padding: 6px 14px; background: #1f7a4d; }
+  header a, footer a, .linkish { color: #fff; font-size: 16px; }
+  .linkish { background: #0f5132; border: 0; border-radius: 4px; padding: 3px 10px; font: inherit; color: #fff; }
+  main { padding: 6px 14px; }
+  h1 { margin: 2px 0 6px; font-size: 24px; }
+  ul { margin: 2px 0 6px; padding-left: 22px; }
+  button { font: inherit; padding: 5px 12px; border-radius: 6px; border: 0; background: #1f7a4d; color: #fff; }
+  input { font: inherit; padding: 3px 8px; width: 150px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  [role=status] { font-weight: 700; margin: 4px 0; }
+  .inline li { display: inline; margin-right: 14px; }
 </style></head>
 <body>
-  <header>
-    <nav aria-label="Main"><a href="/">Home</a> <a href="/search">Search</a> <a href="/cart">Cart (<span id="badge">0</span>)</a></nav>
-  </header>
+  <header><a href="/">Home</a> <a href="/search">Search</a> <a href="/cart">Cart (<span id="badge">0</span>)</a></header>
   <main>${body}</main>
-  <footer><a href="/contact">Contact us</a></footer>
+  <footer>${contact}</footer>
 </body>
 </html>`
-}
-
-function parseCart(query) {
-  return (query ?? "")
-    .split(",")
-    .filter(Boolean)
-    .map((entry) => {
-      const [id = "", count = "1"] = entry.split(":")
-      return { product: products[id], count: Number(count) }
-    })
-    .filter((line) => line.product)
-}
-
-export function startShop({ port, release }) {
-  let searches = 0
-  const broken = release === "v2"
 
   const routes = {
     "/": () =>
       layout(
         "Home",
-        `<h1>Fresh Market</h1><h2>Featured</h2><ul aria-label="Featured products">${Object.entries(products)
+        `<h1>Fresh Market</h1><p>Featured today</p><ul aria-label="Featured products" class="inline">${Object.entries(
+          products,
+        )
           .map(([id, p]) => `<li><a href="/product/${id}">${p.name}</a></li>`)
           .join("")}</ul>`,
       ),
     "/cart": (url) => {
       const lines = parseCart(url.searchParams.get("items"))
-      // v2 bug: the total skips the last line item.
-      const counted = broken ? lines.slice(0, -1) : lines
+      const counted = has("bug") ? lines.slice(0, -1) : lines
       const total = counted.reduce((sum, line) => sum + line.product.price * line.count, 0)
-      const checkout = broken ? "Go to checkout" : "Checkout"
       return layout(
         "Cart",
-        `<h1>Your cart</h1>
-<ul aria-label="Line items">${lines
-          .map((line) => `<li>${line.product.name} × ${line.count}: ${euro(line.product.price * line.count)}</li>`)
-          .join("")}</ul>
-<p role="status" aria-label="Order total">Total: ${euro(total)}</p>
-<form onsubmit="event.preventDefault(); document.getElementById('coupon-result').textContent = 'Coupon applied'">
-  <label>Coupon code <input name="coupon"></label> <button>Apply</button>
-</form>
-<p id="coupon-result" role="alert"></p>
-<button onclick="location.href='/checkout'">${checkout}</button>`,
+        `<div class="cols">
+<div>
+  <h1>Your cart</h1>
+  <ul aria-label="Line items">${lines
+    .map((line) => `<li>${line.product.name} × ${line.count}: ${euro(line.product.price * line.count)}</li>`)
+    .join("")}</ul>
+  <p role="status" aria-label="Order total">Total: ${euro(total)}</p>
+</div>
+<div>
+  <form onsubmit="event.preventDefault(); document.getElementById('coupon-result').textContent = 'Coupon applied'">
+    <p><label>${copy("Coupon code")} <input name="coupon"></label></p>
+    <p><button>Apply</button></p>
+  </form>
+  <p id="coupon-result" role="alert"></p>
+  <p><button onclick="location.href='/checkout'">${copy("Checkout")}</button></p>
+</div>
+</div>`,
       )
     },
     "/checkout": () =>
@@ -103,10 +111,8 @@ export function startShop({ port, release }) {
   }
 
   const server = http.createServer(async (request, response) => {
-    const url = new URL(request.url ?? "/", `http://localhost:${port}`)
+    const url = new URL(request.url ?? "/", "http://localhost")
     if (url.pathname === "/api/search") {
-      // v2: the first search after the release waits on a cold cache.
-      if (broken && searches++ === 0) await new Promise((resolve) => setTimeout(resolve, 8_000))
       const q = (url.searchParams.get("q") ?? "").toLowerCase()
       const found = Object.values(products)
         .map((p) => p.name)
@@ -122,7 +128,7 @@ export function startShop({ port, release }) {
       html = layout(
         p.name,
         `<h1>${p.name}</h1><p>Price: ${euro(p.price)}</p>
-<button onclick="const b = document.getElementById('badge'); b.textContent = Number(b.textContent) + 1">Add to cart</button>`,
+<button onclick="const b = document.getElementById('badge'); b.textContent = Number(b.textContent) + 1">${copy("Add to cart")}</button>`,
       )
     } else {
       html = routes[url.pathname]?.(url)
@@ -135,4 +141,15 @@ export function startShop({ port, release }) {
     server.once("error", reject)
     server.listen(port, "127.0.0.1", () => resolve(server))
   })
+}
+
+function parseCart(query) {
+  return (query ?? "")
+    .split(",")
+    .filter(Boolean)
+    .map((entry) => {
+      const [id = "", count = "1"] = entry.split(":")
+      return { product: products[id], count: Number(count) }
+    })
+    .filter((line) => line.product)
 }
