@@ -7,7 +7,7 @@ what it should, and why a test failed.
 
 | Lane | Who answers the questions |
 | --- | --- |
-| Left, Playwright with an LLM | Claude Sonnet 4.6 through OpenRouter chat completions |
+| Left, Playwright with Claude Opus 5.5 | Claude Opus 5.5 through OpenRouter chat completions, as when Claude Code or Playwright's agents answer these questions with the session model |
 | Right, Playwright with JEV | JEV, TypeSafe's decision engine, through OpenRouter |
 
 Both lanes get identical questions and page data and use the same thresholds and timeouts. Only the
@@ -15,8 +15,8 @@ engine differs, so any time difference is waiting for AI answers.
 
 ## What viewers see
 
-1. **Intro.** "We replaced the LLM calls in our tests with JEV": what JEV is, and 1.3 s versus 0.3 s per
-   question.
+1. **Intro.** "We replaced Claude Opus 5.5 calls in our tests with JEV": what JEV is, and 4.7 s versus 0.3 s
+   per question.
 2. **Race.** Two columns, each with:
    - a stopwatch
    - a bar splitting the time into testing (green) and waiting on AI (striped)
@@ -24,8 +24,9 @@ engine differs, so any time difference is waiting for AI answers.
    - the question the test is asking, with a live counter while it waits
    - the 10 tests, tagged "Healed" or "Bug found"
    - one bar per question showing how long it waited
-3. **Result.** "Same results. 3× less waiting on AI" (3 to 4× across takes). Both lanes heal the same four controls and catch
-   the same cart bug. The test steps take the same time; the waiting does not.
+3. **Result.** "JEV finished 4.8× faster than Claude Opus 5.5, with the same results" (4.8 to 5.0× across
+   takes, 14 to 15× less waiting on AI). Both lanes heal the
+   same four controls and catch the same cart bug. The test steps take the same time; the waiting does not.
 
 ## Run it
 
@@ -41,34 +42,46 @@ Options, passed after `--` (for example `npm run demo -- --llm openai/gpt-4.1-mi
 | --- | --- |
 | `--record` | Save `demo/output/race.webm`, and `race.mp4` when ffmpeg is installed |
 | `--headless` | No window; use with `--record` |
-| `--llm <model>` | Compare against another OpenRouter model |
+| `--llm <model>` | Compare against another OpenRouter model, for example `anthropic/claude-sonnet-4.6` |
 | `--provider typesafe` | Call JEV through TypeSafe's API with `TYPESAFE_API_KEY` |
 | `--release v1` | Nothing broken: fewer questions, the lanes only differ on page checks |
 | `--hold-ms 14000` | How long the result screen stays up |
 
-A recording is about 50 seconds: 9 seconds of intro, about 28 seconds of race, and the result screen.
+A recording is about 100 seconds: 9 seconds of intro, about 73 seconds of race (JEV is done after 15), and
+the result screen.
 
 ## Measured numbers
 
-Recorded runs on one laptop, live APIs, no caching:
+Two recorded runs on one laptop, live APIs, no caching:
 
-| | LLM lane | JEV lane |
+| | Claude Opus 5.5 lane | JEV lane |
 | --- | --- | --- |
-| Total run time | 26.1 to 28.4 s | 14.0 to 15.9 s |
-| Waiting on AI | 16.0 to 17.6 s | 4.0 to 5.7 s |
-| Average per question | 1.33 to 1.47 s | 0.33 to 0.47 s |
-| Test steps | about 10 s | about 10 s |
-| AI cost per run | $0.022 | $0.0003 |
+| Total run time | 69.3 to 72.5 s | 14.4 to 14.6 s |
+| Waiting on AI | 59.1 to 62.3 s | 4.2 to 4.3 s |
+| Average per question | 4.93 to 5.19 s | 0.35 to 0.36 s |
+| Test steps | about 10.2 s | about 10.2 s |
+| AI cost per run | $0.053 | $0.0003 |
 | Tests passed, bugs caught | 9 of 10, 1 | 9 of 10, 1 |
 
-Before building the demo, the same heal question was also timed against other LLMs: Claude Haiku 4.5
-2.0 to 2.2 s, GPT-4.1 mini 1.1 to 1.3 s, JEV 0.26 to 0.67 s. All picked the right element. GPT-4.1 mini
-answered one page check wrongly, and Claude Sonnet 5 and GPT-5 mini took 3.6 to 8.9 s per page check.
+Other engines on the same questions, timed separately:
+
+| Engine | Per question | All answers correct |
+| --- | --- | --- |
+| JEV | 0.3 to 0.6 s | Yes |
+| Claude Sonnet 4.6 | 1.2 to 1.7 s | Yes |
+| GPT-4.1 mini | 1.1 to 1.5 s | One page check wrong |
+| Claude Haiku 4.5 | 2.0 to 2.2 s | Yes |
+| Claude Opus 5 | 2.2 to 5.9 s | Yes |
+| Claude Opus 5.5 | 2.5 to 7.8 s | Yes |
+
+With Claude Sonnet 4.6 as the baseline (`--llm anthropic/claude-sonnet-4.6`), the recorded runs took
+26 to 28 s against 14 to 16 s for JEV.
 
 ## Honest framing
 
 - The speedup is in the AI questions, not in Playwright itself. The more questions a suite asks, the
   larger the share of time JEV saves; a suite that asks none gains nothing.
-- The LLM lane is a fair baseline for an LLM-based self-healing or checking step, not the slowest
-  possible one. A reasoning model would be much slower; see the numbers above.
+- Opus 5.5 is what these questions go to when a Claude Code session on Opus answers them. Test code that
+  calls an API directly would more likely use a smaller model; Sonnet 4.6 is the closest baseline for that,
+  and JEV is still about 4× faster per question there.
 - Results vary slightly between runs, because API latency varies. Record a few takes.

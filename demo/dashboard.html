@@ -135,7 +135,7 @@
 <body>
 <div class="race">
   <div class="top">
-    <h1>Same tests, same questions, two decision engines</h1>
+    <h1 id="race-title">Same tests, same questions, two decision engines</h1>
     <p id="topline"></p>
   </div>
 
@@ -144,8 +144,8 @@
       <div class="lane-head">
         <div>
           <div class="engine" id="engine-llm"></div>
-          <h2>Playwright with an LLM</h2>
-          <p class="sub">Each question is a chat call that writes out its answer</p>
+          <h2 class="llm-name">Playwright with an LLM</h2>
+          <p class="sub">Each question is a full model call that writes out its answer</p>
         </div>
         <div class="clock num" id="clock-llm">0.0s<small>total run time</small></div>
       </div>
@@ -182,19 +182,16 @@
 
 <div class="screen" id="intro">
   <div class="inner">
-    <h2>We replaced the LLM calls in our tests with JEV.</h2>
-    <p class="lede">
-      AI-assisted Playwright suites ask small questions while they run: which button is this now, does this page look right, why did this
-      test fail. Usually a general LLM answers each one. <b>JEV is a fast decision engine</b> built for exactly these questions.
-    </p>
+    <h2 id="intro-title">We replaced the LLM calls in our tests with JEV.</h2>
+    <p class="lede" id="intro-lede"></p>
     <div class="versus">
       <div class="card llm">
-        <h3>LLM call</h3>
-        <p>A general language model reads the page and writes its answer out as text. Built for conversation and open-ended work.</p>
+        <h3 id="intro-llm-name">LLM call</h3>
+        <p>A frontier language model reads the page, reasons about it, and writes its answer out as text. Built for open-ended work.</p>
         <div class="speed num" id="intro-llm-speed"></div>
       </div>
       <div class="card jev">
-        <h3>JEV decision</h3>
+        <h3>JEV</h3>
         <p>A decision model reads the page and returns a typed answer with a probability: which element, yes or no, which cause.</p>
         <div class="speed num">0.3 s<small> per question, measured</small></div>
       </div>
@@ -208,7 +205,7 @@
     <h2 id="end-title">Results</h2>
     <p class="lede" id="end-lede"></p>
     <div class="totals">
-      <div class="card llm"><h3>Playwright with an LLM</h3><div class="big num" id="end-llm-time"></div><dl id="end-llm"></dl></div>
+      <div class="card llm"><h3 class="llm-name">Playwright with an LLM</h3><div class="big num" id="end-llm-time"></div><dl id="end-llm"></dl></div>
       <div class="card jev"><h3>Playwright with JEV</h3><div class="big num" id="end-jev-time"></div><dl id="end-jev"></dl></div>
     </div>
     <p class="fine" id="fine"></p>
@@ -219,7 +216,7 @@
   const params = new URLSearchParams(location.search)
   const release = params.get("release") ?? "v2"
   const jevProvider = params.get("provider") ?? "openrouter"
-  const llmModel = params.get("llm") ?? "anthropic/claude-sonnet-4.6"
+  const llmModel = params.get("llm") ?? "anthropic/claude-opus-5.5"
   const lanes = ["llm", "jev"]
 
   const labels = {
@@ -239,8 +236,19 @@
     const name = id.split("/").at(-1).replace(/-(\d)/g, " $1").replace(/-/g, " ")
     return name.replace(/\b[a-z]/g, (letter) => letter.toUpperCase()).replace(/^Gpt/, "GPT")
   }
+  const llmName = friendlyModel(llmModel)
+  const vendor = llmModel.startsWith("anthropic/") ? "Claude " : ""
 
-  document.getElementById("engine-llm").textContent = `${friendlyModel(llmModel)} via OpenRouter`
+  document.getElementById("race-title").textContent = `${vendor}${llmName.replace(/^Claude /, "")} vs JEV: same tests, same questions`
+  for (const element of document.querySelectorAll(".llm-name")) element.textContent = `Playwright with ${llmName}`
+  document.getElementById("lane-llm").setAttribute("aria-label", `Playwright with ${llmName}`)
+  document.getElementById("intro-title").textContent = `We replaced ${llmName} calls in our tests with JEV.`
+  document.getElementById("intro-llm-name").textContent = `${llmName} call`
+  document.getElementById("intro-lede").innerHTML =
+    "AI-assisted Playwright suites ask small questions while they run: which button is this now, does this page look right, why " +
+    `did this test fail. In Claude Code or Playwright's agents, the session model answers each one, here <b>${llmName}</b>. ` +
+    "<b>JEV is a fast decision engine</b> built for exactly these questions."
+  document.getElementById("engine-llm").textContent = `${llmName} via OpenRouter`
   document.getElementById("engine-jev").textContent = `JEV via ${jevProvider === "typesafe" ? "TypeSafe" : "OpenRouter"}`
   document.getElementById("topline").textContent =
     release === "v2" ? "Release 2: four renamed controls and a cart bug" : "Release 1: nothing broken"
@@ -249,7 +257,13 @@
     (release === "v2" ? "Release 2 of the shop renamed four controls and broke the cart total." : "Release 1 of the shop has no problems.")
 
   // Typical wait per question, measured before recording on the pages in this demo.
-  const typicalLlm = { "anthropic/claude-sonnet-4.6": "1.3 s", "openai/gpt-4.1-mini": "1.3 s", "anthropic/claude-haiku-4.5": "2.1 s" }
+  const typicalLlm = {
+    "anthropic/claude-opus-5.5": "4.7 s",
+    "anthropic/claude-opus-5": "4.1 s",
+    "anthropic/claude-sonnet-4.6": "1.3 s",
+    "openai/gpt-4.1-mini": "1.3 s",
+    "anthropic/claude-haiku-4.5": "2.1 s",
+  }
   document.getElementById("intro-llm-speed").innerHTML = typicalLlm[llmModel]
     ? `${typicalLlm[llmModel]}<small> per question, measured</small>`
     : `Slower<small> per question</small>`
@@ -389,34 +403,44 @@
       </div>`
   }
 
-  const barScaleMs = 2500
+  // Both lanes share one scale, set by the slowest answer so far, so bar heights compare directly.
+  let barScaleMs = 2500
+
+  function laneBars(lane, now) {
+    const laneState = state.lanes[lane]
+    const done = laneState.decisions.map((decision) => ({ ms: decision.latencyMs, open: false }))
+    const open = [...laneState.open.values()].map((decision) => ({ ms: now - decision.startedAt, open: true }))
+    return [...done, ...open]
+  }
 
   function renderBars(lane, now) {
-    const laneState = state.lanes[lane]
     const container = document.getElementById(`bars-${lane}`)
     const height = container.clientHeight - 22
     const px = (ms) => Math.max(3, Math.min(1, ms / barScaleMs) * height)
-    const done = laneState.decisions.map((decision) => ({ ms: decision.latencyMs, open: false }))
-    const open = [...laneState.open.values()].map((decision) => ({ ms: now - decision.startedAt, open: true }))
-    const lines = [1000, 2000]
-      .map((ms) => `<div class="gridline" style="bottom:${px(ms)}px"><b>${ms / 1000} s</b></div>`)
-      .join("")
+    const bars = laneBars(lane, now)
+    const step = barScaleMs > 6000 ? 2000 : 1000
+    const lines = []
+    for (let ms = step; ms < barScaleMs; ms += step) {
+      lines.push(`<div class="gridline" style="bottom:${px(ms)}px"><b>${ms / 1000} s</b></div>`)
+    }
     container.innerHTML =
-      lines +
-      [...done, ...open]
+      lines.join("") +
+      bars
         .map((bar) => `<div class="q${bar.open ? " open" : ""}" style="height:${px(bar.ms)}px"><span>${(bar.ms / 1000).toFixed(1)}</span></div>`)
         .join("")
   }
 
   function render() {
     const now = Date.now()
+    const slowest = Math.max(0, ...lanes.flatMap((lane) => laneBars(lane, now).map((bar) => bar.ms)))
+    barScaleMs = Math.max(barScaleMs, Math.ceil((slowest * 1.1) / 1000) * 1000)
+    for (const lane of lanes) renderBars(lane, now)
     for (const lane of lanes) {
       const laneState = state.lanes[lane]
       const clock = document.getElementById(`clock-${lane}`)
       clock.firstChild.textContent = seconds(state.startAt === null ? 0 : (laneState.doneAt ?? now) - state.startAt)
       renderBubble(lane, now)
       renderSplit(lane, now)
-      renderBars(lane, now)
       for (const test of laneState.tests.values()) {
         if (test.status === "running") test.row.querySelector(".t").textContent = seconds(now - test.start)
       }
@@ -448,14 +472,14 @@
     const same = llm.passed === jev.passed && llm.bugs === jev.bugs
     const waitRatio = llm.ai / jev.ai
     document.getElementById("end-title").textContent =
-      `${same ? "Same results. " : ""}${waitRatio.toFixed(0)}× less waiting on AI.`
+      `JEV finished ${(llm.total / jev.total).toFixed(1)}× faster than ${llmName}${same ? ", with the same results" : ""}.`
     document.getElementById("end-lede").innerHTML =
       (same
         ? `Both lanes healed ${jev.healed} renamed controls and caught the same cart bug. `
-        : `The LLM lane passed ${llm.passed} tests, the JEV lane ${jev.passed}. `) +
+        : `The ${llmName} lane passed ${llm.passed} tests, the JEV lane ${jev.passed}. `) +
       `The test steps took about the same time in both, ${seconds(llm.total - llm.ai)} and ${seconds(jev.total - jev.ai)}. ` +
-      `The difference is the wait for AI answers: <b>${seconds(llm.avg, 2)} per question for the LLM, ${seconds(jev.avg, 2)} for JEV</b>. ` +
-      `That makes the whole run <b>${(llm.total / jev.total).toFixed(1)}× faster</b>, and the more questions a suite asks, the bigger the gap.`
+      `The difference is the wait for AI answers: <b>${seconds(llm.avg, 2)} per question for ${llmName}, ${seconds(jev.avg, 2)} for JEV</b>, ` +
+      `<b>${waitRatio.toFixed(0)}× less waiting</b>. The more questions a suite asks, the bigger the gap.`
     const rows = (s) => `
       <dt>Waiting on AI</dt><dd class="num">${seconds(s.ai)}</dd>
       <dt>Average per question</dt><dd class="num">${seconds(s.avg, 2)}</dd>
@@ -468,7 +492,7 @@
     document.getElementById("end-llm").innerHTML = rows(llm)
     document.getElementById("end-jev").innerHTML = rows(jev)
     document.getElementById("fine").textContent =
-      `Measured live on one laptop with no caching. Left: ${friendlyModel(llmModel)} through OpenRouter chat completions. ` +
+      `Measured live on one laptop with no caching. Left: ${llmName} through OpenRouter chat completions. ` +
       `Right: JEV through ${jevProvider === "typesafe" ? "TypeSafe" : "OpenRouter"}. Both engines get identical questions and page data, ` +
       "and both lanes use the same thresholds and timeouts."
     const screen = document.getElementById("end")

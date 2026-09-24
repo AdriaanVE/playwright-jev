@@ -3,6 +3,13 @@
 All notable changes to this project are documented in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and Semantic Versioning.
 
+## [0.4.1] - 2026-09-24
+
+### Changed
+
+- The demo now races JEV against Claude Opus 5.5 by default and names the model on every screen. The
+  per-question chart scales to the slowest answer.
+
 ## [0.4.0] - 2026-09-24
 
 ### Changed

@@ -1,6 +1,6 @@
 {
   "name": "playwright-jev",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Structured JEV decisions for Playwright: failure triage, smart retries, healer gating, snapshot pruning, locator healing, semantic assertions, and test impact ordering.",
   "type": "module",
   "license": "UNLICENSED",

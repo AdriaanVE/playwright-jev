@@ -1,7 +1,7 @@
 // The "before" lane: the same typed questions answered by a general LLM through OpenRouter chat
 // completions, the way an LLM-based self-healing or triage step works today. It receives exactly the same
 // state and questions as JEV, so any difference in the demo comes from the decision engine alone.
-export const defaultLlmModel = "anthropic/claude-sonnet-4.6"
+export const defaultLlmModel = "anthropic/claude-opus-5.5"
 
 const system = `You are the decision step inside an automated Playwright test pipeline.
 Read the application state and answer every question.
