@@ -43,10 +43,11 @@ Features 1 to 3 share one decision per failure.
 ## Install
 
 ```sh
-npm install -D playwright-jev
+npm install -D github:AdriaanVE/playwright-jev#v0.1.0
 export OPENROUTER_API_KEY=...   # or TYPESAFE_API_KEY with provider type "typesafe"
 ```
 
+The package is not on the npm registry yet; installing from GitHub builds it through the `prepare` script.
 Requires Node 22 and `@playwright/test` 1.63 or newer (the version this package is tested with).
 
 ## Configure the provider
@@ -202,3 +203,7 @@ npm run test:e2e   # uses a stub provider; no API key needed
 Set `PLAYWRIGHT_JEV_CONFIG` to a config file without the stub provider to run the e2e suite against live
 JEV. `FAILING=1 npx playwright test -c e2e/playwright.failing.config.ts` runs intentional failures to
 exercise triage, `retry`, and `heal`.
+
+## License
+
+[MIT](LICENSE)

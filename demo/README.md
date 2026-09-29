@@ -1,5 +1,37 @@
 # Decision race demo
 
+## Explainer video
+
+`npm run demo:explainer` renders `demo/output/explainer.mp4`, a 103-second explainer for engineers: what JEV
+is, what goes in and comes out, and what it changes in a Playwright suite. It needs no API keys:
+[`explainer/explainer.html`](explainer/explainer.html) draws every frame as a function of time, and
+[`explainer/render.mjs`](explainer/render.mjs) steps through it with Playwright and encodes the frames with ffmpeg.
+
+Sound effects are synthesized in [`explainer/sounds.mjs`](explainer/sounds.mjs) from cues the page derives from its
+own timeline, so they stay in sync when scenes move. They are sparse and quiet (peak about -12 dBFS): a soft
+whoosh on scene changes, a tick per token while the LLM writes, a chime when JEV answers, a low knock when the
+LLM answers, two falling notes for the caught bug, and a soft chord on the results and end card.
+
+| Time | Scene |
+| --- | --- |
+| 0 to 13 s | JEV is a non-autoregressive decision engine, extremely fast and cheap: one forward pass for every question against one per token for an LLM, with 0.35 s and $0.000025 per decision against 4.9 s and $0.0044 |
+| 13 to 26 s | Input: unstructured state (an accessibility snapshot) inside a structured `/v1/systemone` request |
+| 26 to 42 s | `noul`, `choice`, and `score`: criteria, answer JSON, and probabilities for each |
+| 42 to 52 s | Output: typed answers checked against playwright-jev's default thresholds |
+| 52 to 62 s | playwright-jev: which Playwright extension point uses which question type |
+| 62 to 72 s | Locator healing on the demo shop, both engines in real time, with cost per decision |
+| 72 to 84 s | The whole suite, 8× speed, with questions, waiting time, and AI cost adding up per lane |
+| 84 to 96 s | Results: 4.8× faster and 177× cheaper with the same outcomes, plus each lane's triage cost line |
+| 96 to 103 s | End card |
+
+Timings, costs, and outcomes come from the recorded runs in [Measured numbers](#measured-numbers), and
+the triage lines from those runs' `triage.md`. The probabilities in the question-type scene are example values. Open `explainer.html` in a
+browser to preview it live (click to restart, add `#t=31` to jump to a time). Pass `--fps 60` for a smoother
+render, `--stills 12,26` to save PNG frames instead, `--silent` for no sound, or `--audio-only` to rebuild just the
+sound track of the last render.
+
+## Live race
+
 A side-by-side race for a non-technical audience. The same AI-assisted Playwright suite runs twice, at
 the same time, against a shop release that renamed four controls and broke the cart total. While the
 tests run, they ask AI 12 small questions: which element a renamed button is now, whether a page shows

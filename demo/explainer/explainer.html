@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JEV Explainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+<!--
+  Explainer video for engineers: what JEV is, what goes in and comes out, and what it changes in a Playwright suite.
+  Every frame is a pure function of time: render(t) positions everything, so render.mjs can step through it frame by
+  frame and encode an MP4. Opened directly in a browser, it plays in real time (click to restart, add #t=12 to start
+  at 12 seconds).
+
+  Elements with data-in="<seconds>" reveal themselves at that time; data-fx picks the motion (up, left, right, pop,
+  fade). Sections carry their own time window in data-a and data-b.
+-->
+<style>
+  :root {
+    --bg: #0b0a17;
+    --card: #14122a;
+    --card-hi: #1c1938;
+    --rule: #2b2850;
+    --ink: #f4f2ff;
+    --muted: #a8a2cc;
+    --dim: #6f6a94;
+    --llm: #ff6b4a;
+    --llm-soft: #ff6b4a26;
+    --jev: #7d6bff;
+    --jev-hi: #b3a9ff;
+    --jev-soft: #7d6bff2e;
+    --ok: #2fd28c;
+    --bug: #ff4d6d;
+    --key: #c9b8ff;
+    --str: #ffe08a;
+    --numc: #7ee2b8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #stage {
+    position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden;
+    background: var(--bg); color: var(--ink); font-family: "Archivo", system-ui, sans-serif;
+  }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+  .num { font-variant-numeric: tabular-nums; }
+  .abs { position: absolute; }
+  .scene { position: absolute; inset: 0; opacity: 0; }
+  .glow { position: absolute; border-radius: 50%; filter: blur(140px); }
+  .grid {
+    position: absolute; inset: 0; opacity: 0.3;
+    background-image: linear-gradient(var(--rule) 1px, transparent 1px), linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+    background-size: 80px 80px;
+    mask-image: radial-gradient(ellipse at center, #000 20%, transparent 75%);
+  }
+  .head { position: absolute; left: 120px; top: 64px; right: 120px; }
+  .kicker { font-size: 22px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .h2 { font-size: 56px; line-height: 1.08; font-weight: 900; letter-spacing: -0.02em; margin: 10px 0 0; }
+  .lede { font-size: 28px; line-height: 1.4; color: var(--muted); margin: 0; }
+  .lede b { color: var(--ink); }
+  .llm-c { color: var(--llm); }
+  .jev-c { color: var(--jev-hi); }
+  .ok-c { color: var(--ok); }
+  .bug-c { color: var(--bug); }
+  .card { background: var(--card); border: 2px solid var(--rule); border-radius: 18px; }
+  .label { font-size: 18px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+  .note { font-size: 20px; color: var(--dim); line-height: 1.5; }
+
+  /* Code and JSON */
+  .code { font-family: "JetBrains Mono", ui-monospace, monospace; white-space: pre; line-height: 1.55; }
+  .code:has(> div) { white-space: normal; }
+  .code > div { white-space: pre; min-height: 1.55em; }
+  .k { color: var(--key); } .s { color: var(--str); } .n { color: var(--numc); } .c { color: var(--dim); }
+  .kw { color: #ff8fd0; } .fn { color: #8fd6ff; } .hl { color: var(--jev-hi); font-weight: 800; }
+
+  /* Bars */
+  .bars { display: grid; gap: 10px; }
+  .bar-row { display: grid; grid-template-columns: 170px 1fr 64px; gap: 12px; align-items: center; font-size: 21px; }
+  .bar-row .track { height: 14px; border-radius: 7px; background: var(--rule); overflow: hidden; }
+  .bar-row .fill { height: 100%; border-radius: 7px; background: var(--jev); width: 0; }
+  .bar-row.top { font-weight: 800; }
+  .bar-row.top .fill { background: linear-gradient(90deg, var(--jev), var(--jev-hi)); }
+  .bar-row .p { text-align: right; color: var(--muted); }
+
+  /* 2. Autoregressive vs non-autoregressive */
+  .lane2 { position: absolute; left: 120px; width: 1680px; height: 318px; padding: 26px 32px; }
+  .lane2 .title { font-size: 30px; font-weight: 900; }
+  .lane2 .title span { font-size: 21px; font-weight: 600; color: var(--muted); margin-left: 14px; }
+  .inbox { position: absolute; left: 32px; top: 110px; width: 250px; height: 120px; border-radius: 14px; border: 2px dashed var(--dim); display: grid; place-items: center; text-align: center; font-size: 22px; color: var(--muted); line-height: 1.3; }
+  .model { position: absolute; top: 100px; width: 140px; height: 140px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 24px; text-align: center; line-height: 1.1; }
+  .model.llm { left: 330px; border: 3px solid var(--llm); background: radial-gradient(circle, #ff6b4a55, #ff6b4a10); }
+  .model.jev { left: 330px; border: 3px solid var(--jev-hi); background: radial-gradient(circle, #7d6bffaa, #7d6bff22 70%); font-size: 34px; }
+  .loop { position: absolute; left: 318px; top: 88px; width: 164px; height: 164px; border-radius: 50%; border: 3px dashed var(--llm); }
+  .tokens { position: absolute; left: 530px; top: 104px; width: 1100px; font-size: 25px; line-height: 1.8; }
+  .tok { display: inline-block; margin: 0 5px 8px 0; padding: 0 8px; border-radius: 7px; background: var(--llm-soft); color: #ffd9cf; }
+  .outs { position: absolute; left: 530px; top: 108px; display: flex; gap: 16px; }
+  .out { padding: 14px 20px; border-radius: 12px; background: var(--jev-soft); border: 2px solid var(--jev); font-size: 24px; }
+  .counter { position: absolute; right: 32px; top: 26px; font-size: 24px; color: var(--muted); }
+  .counter b { font-size: 34px; color: var(--ink); }
+  .lane2 .cap { position: absolute; left: 32px; bottom: 22px; font-size: 22px; color: var(--muted); }
+  .wire { position: absolute; height: 3px; background: var(--dim); }
+  .price { position: absolute; right: 32px; bottom: 52px; text-align: right; font-size: 64px; font-weight: 900; font-variation-settings: "wdth" 118; line-height: 1; }
+  .price small { display: block; margin-top: 6px; font-size: 24px; font-weight: 700; color: var(--ink); font-variation-settings: "wdth" 100; }
+
+  /* 3. Request */
+  .raw { position: absolute; left: 120px; top: 250px; width: 640px; padding: 26px 28px; }
+  .raw .code { font-size: 21px; color: #d9d4f5; margin-top: 12px; }
+  .req { position: absolute; left: 880px; top: 220px; width: 920px; padding: 24px 30px; font-size: 20px; }
+  .arrow { position: absolute; height: 4px; background: linear-gradient(90deg, var(--dim), var(--jev-hi)); border-radius: 2px; }
+  .arrow::after { content: ""; position: absolute; right: -4px; top: -8px; border: 10px solid transparent; border-left: 14px solid var(--jev-hi); }
+  .tagline { position: absolute; padding: 8px 14px; border-radius: 10px; font-size: 21px; font-weight: 700; background: var(--card-hi); border: 2px solid var(--jev); color: var(--jev-hi); }
+
+  /* 4. Question types */
+  .qt { position: absolute; top: 230px; width: 540px; height: 740px; padding: 26px 28px; }
+  .qt .name { font-size: 44px; font-weight: 900; color: var(--jev-hi); }
+  .qt .ask { font-size: 24px; color: var(--muted); margin-top: 2px; }
+  .qt .code { font-size: 19px; margin-top: 10px; }
+  .qt .sect { margin-top: 22px; }
+  .qt .bars { margin-top: 18px; }
+  .qt .bar-row { grid-template-columns: 120px 1fr 56px; font-size: 20px; }
+  .qt .means { position: absolute; left: 28px; right: 28px; bottom: 24px; font-size: 21px; line-height: 1.4; color: var(--muted); }
+  .qt .means b { color: var(--ink); }
+
+  /* 5. Output in code */
+  .out-code { position: absolute; left: 120px; top: 250px; width: 1060px; padding: 30px 36px; font-size: 25px; }
+  .thr { position: absolute; left: 1220px; top: 250px; width: 580px; padding: 30px 32px; }
+  .thr .row { display: flex; justify-content: space-between; font-size: 25px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+  .thr .row b { font-family: "JetBrains Mono", monospace; color: var(--jev-hi); }
+  .gauge { position: absolute; left: 120px; top: 760px; width: 1060px; height: 150px; }
+  .gauge .track { position: absolute; left: 0; right: 0; top: 60px; height: 18px; border-radius: 9px; background: var(--rule); }
+  .gauge .mark { position: absolute; top: 40px; width: 4px; height: 58px; background: var(--ink); }
+  .gauge .mark span { position: absolute; left: 50%; transform: translateX(-50%); top: -34px; font-size: 20px; white-space: nowrap; color: var(--muted); }
+  .gauge .dot { position: absolute; top: 55px; width: 28px; height: 28px; margin-left: -14px; border-radius: 50%; background: var(--bug); box-shadow: 0 0 0 8px #ff4d6d33; }
+  .gauge .verdict { position: absolute; left: 0; top: 108px; font-size: 24px; }
+
+  /* 6. Features */
+  .ftable { position: absolute; left: 120px; top: 230px; width: 1680px; }
+  .frow { display: grid; grid-template-columns: 520px 560px 1fr; gap: 20px; padding: 15px 24px; font-size: 25px; border-bottom: 1px solid var(--rule); align-items: center; }
+  .frow.h { font-size: 18px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+  .frow .mono { font-size: 22px; color: #d9d4f5; }
+  .frow .qtag { font-family: "JetBrains Mono", monospace; font-size: 21px; font-weight: 800; padding: 3px 12px; border-radius: 8px; background: var(--jev-soft); color: var(--jev-hi); margin-right: 10px; }
+  .fcode { position: absolute; left: 120px; top: 760px; width: 1680px; padding: 24px 32px; font-size: 23px; }
+
+  /* 7. One question, both engines */
+  .panel { position: absolute; top: 230px; width: 820px; height: 690px; padding: 30px 34px; border-top-width: 10px; }
+  .panel.l { left: 120px; border-top-color: var(--llm); }
+  .panel.r { left: 980px; border-top-color: var(--jev); }
+  .panel .who { font-size: 36px; font-weight: 900; }
+  .panel .sub { font-size: 20px; color: var(--muted); margin-top: 4px; }
+  .panel .clock { position: absolute; right: 34px; top: 16px; font-size: 92px; font-weight: 900; font-variation-settings: "wdth" 118; line-height: 1; }
+  .panel .pcost { position: absolute; right: 34px; top: 112px; font-size: 24px; color: var(--muted); }
+  .panel .pcost b { color: var(--ink); }
+  .shop { position: absolute; left: 34px; top: 160px; width: 752px; height: 250px; border-radius: 12px; overflow: hidden; background: #fff; color: #1d2433; font-family: system-ui, sans-serif; }
+  .shop .bar { height: 44px; background: #1f7a4d; color: #fff; display: flex; gap: 16px; align-items: center; padding: 0 16px; font-size: 20px; text-decoration: underline; }
+  .shop h4 { margin: 12px 22px 4px; font-size: 28px; }
+  .shop p { margin: 4px 22px; font-size: 21px; }
+  .shop .row { display: flex; gap: 14px; margin: 12px 22px; align-items: center; font-size: 20px; }
+  .shop .btn { background: #1f7a4d; color: #fff; padding: 8px 16px; border-radius: 6px; font-size: 21px; }
+  .shop .input { border: 1px solid #999; width: 130px; height: 30px; border-radius: 3px; }
+  .pick { position: absolute; border: 5px solid var(--ok); border-radius: 12px; box-shadow: 0 0 0 8px #2fd28c33; }
+  .shop .pick span { position: absolute; left: calc(100% + 14px); top: 50%; transform: translateY(-50%); padding: 5px 14px; border-radius: 8px; background: var(--ok); color: #04210f; font-weight: 800; font-size: 22px; white-space: nowrap; font-family: "Archivo", sans-serif; }
+  .panel .qtext { position: absolute; left: 34px; top: 430px; right: 34px; font-size: 24px; color: var(--muted); }
+  .panel .stream { position: absolute; left: 34px; right: 34px; top: 480px; font-size: 20px; line-height: 1.6; }
+  .panel .stream .tok { font-size: 19px; margin-bottom: 4px; }
+
+  /* 8. Suite race */
+  .lane { position: absolute; left: 120px; width: 1680px; height: 320px; padding: 26px 36px; }
+  .lane .who { font-size: 34px; font-weight: 900; }
+  .lane .stats { margin-top: 8px; font-size: 23px; color: var(--muted); display: flex; gap: 36px; }
+  .lane .stats b { color: var(--ink); font-family: "JetBrains Mono", monospace; font-weight: 600; }
+  .lane .clock { position: absolute; right: 36px; top: 18px; font-size: 92px; font-weight: 900; font-variation-settings: "wdth" 118; line-height: 1; }
+  .lane .track { position: absolute; left: 36px; right: 36px; top: 150px; height: 40px; border-radius: 10px; background: var(--rule); overflow: hidden; }
+  .lane .work, .lane .wait { position: absolute; top: 0; bottom: 0; }
+  .lane .work { background: var(--ok); }
+  .lane.llm .wait { background: repeating-linear-gradient(-45deg, var(--llm) 0 12px, #b23c23 12px 24px); }
+  .lane.jev .wait { background: repeating-linear-gradient(-45deg, var(--jev) 0 12px, #4a38d6 12px 24px); }
+  .tests { position: absolute; left: 36px; right: 36px; top: 220px; display: flex; gap: 10px; }
+  .t { flex: 1; height: 58px; border-radius: 10px; background: var(--card-hi); border: 2px solid var(--rule); display: grid; place-items: center; font-size: 19px; font-weight: 700; color: var(--dim); }
+  .t.pass { background: #0f3b29; border-color: var(--ok); color: #bdf5d9; }
+  .t.heal { background: #241d66; border-color: var(--jev); color: var(--jev-hi); }
+  .t.bug { background: #4a1020; border-color: var(--bug); color: #ffc2cc; }
+  .done { position: absolute; top: 150px; font-size: 24px; font-weight: 900; padding: 6px 16px; border-radius: 10px; background: var(--ok); color: #04210f; }
+  .legend { position: absolute; left: 120px; top: 982px; display: flex; gap: 34px; font-size: 22px; color: var(--muted); }
+  .legend i { display: inline-block; width: 18px; height: 18px; border-radius: 4px; margin-right: 10px; vertical-align: -2px; }
+
+  /* 9. Results */
+  .rtable { position: absolute; left: 120px; top: 220px; width: 1680px; }
+  .rrow { display: grid; grid-template-columns: 1fr 340px 340px 240px; padding: 14px 28px; font-size: 28px; border-bottom: 1px solid var(--rule); align-items: baseline; }
+  .rrow > :not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+  .rrow.h { font-size: 20px; font-weight: 800; color: var(--muted); }
+  .rrow .x { color: var(--jev-hi); font-weight: 900; }
+  .rrow.key { background: #7d6bff14; }
+  .triage { position: absolute; left: 120px; top: 790px; width: 1680px; padding: 22px 28px; font-size: 22px; }
+  .triage .code { font-size: 21px; margin-top: 8px; }
+
+  /* 10. End */
+  .end-title { font-size: 120px; font-weight: 900; letter-spacing: -0.035em; font-variation-settings: "wdth" 110; }
+  .install { display: inline-block; padding: 18px 30px; font-size: 34px; border-radius: 14px; background: var(--card-hi); border: 2px solid var(--jev); }
+
+  .progress { position: absolute; left: 0; bottom: 0; height: 5px; background: linear-gradient(90deg, var(--llm), var(--jev)); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="glow" id="glow-a" style="width:900px;height:900px;background:var(--jev)"></div>
+  <div class="glow" id="glow-b" style="width:760px;height:760px;background:var(--llm)"></div>
+  <div class="grid"></div>
+
+  <!-- 2. What JEV is: non-autoregressive -->
+  <section class="scene" id="s2" data-a="0" data-b="13.4">
+    <div class="head">
+      <div class="kicker" data-in="0.5">What JEV is</div>
+      <h2 class="h2" data-in="0.7">A <span class="jev-c">non-autoregressive</span> decision engine.<br><span class="ok-c">Extremely fast and cheap.</span></h2>
+      <p class="lede" data-in="1.0" style="margin-top:12px;font-size:25px">It scores the options you define instead of generating text, so there are no output tokens to wait for or pay for.</p>
+    </div>
+    <div class="card lane2" style="top:318px" data-in="1.2">
+      <div class="title llm-c">Autoregressive LLM<span>generates the answer</span></div>
+      <div class="counter num">forward passes <b id="ar-count">0</b></div>
+      <div class="inbox">prompt with<br>page + question</div>
+      <div class="wire" style="left:314px;top:170px;width:20px"></div>
+      <div class="loop" id="ar-loop"></div>
+      <div class="model llm" id="ar-model">LLM</div>
+      <div class="tokens mono" id="ar-tokens"></div>
+      <div class="cap">One pass per output token, each waits on the last. The result is text you still have to parse.</div>
+      <div class="price num llm-c" id="price-llm">4.9 s<small>$0.0044 per decision</small></div>
+    </div>
+    <div class="card lane2" style="top:664px;border-color:var(--jev)" data-in="1.5">
+      <div class="title jev-c">JEV<span>scores the options you defined</span></div>
+      <div class="counter num">forward passes <b id="nar-count">0</b></div>
+      <div class="inbox">state +<br>typed questions</div>
+      <div class="model jev" id="nar-model">JEV</div>
+      <div class="outs mono">
+        <div class="out" id="nar-1">noul <b>0.03</b></div>
+        <div class="out" id="nar-2">choice <b>e12</b> · 0.94</div>
+        <div class="out" id="nar-3">score <b>3</b> · 0.80</div>
+      </div>
+      <div class="cap">All questions answered in one pass. No tokens to generate, nothing to parse: typed values with probabilities.</div>
+      <div class="price num jev-c" id="price-jev">0.35 s<small>$0.000025 per decision</small></div>
+    </div>
+  </section>
+
+  <!-- 3. Input: unstructured data in a structured request -->
+  <section class="scene" id="s3" data-a="13" data-b="26.4">
+    <div class="head">
+      <div class="kicker" data-in="13.5">Input</div>
+      <h2 class="h2" data-in="13.7">Unstructured data, in a structured request.</h2>
+    </div>
+    <div class="card raw" data-in="14.2" data-fx="left">
+      <div class="label">Raw state: accessibility snapshot</div>
+      <div class="code">- heading "Your cart" [level=1]
+- listitem: Apple × 2: €5.00
+- listitem: Pear × 1: €2.00
+- status "Order total": Total: €5.00
+- textbox "Promo code"
+- button "Apply"
+- button "Go to checkout"</div>
+      <div class="note" style="margin-top:18px">Could equally be a stack trace, a diff, a log, or any JSON. JEV reads it as-is.</div>
+    </div>
+    <div class="arrow" id="s3-arrow" style="left:780px;top:520px;width:80px" data-in="15.6" data-fx="right"></div>
+    <div class="card req code" id="s3-req">
+      <div class="c">// POST /v1/systemone</div>
+      <div>{</div>
+      <div>  <span class="k">"model"</span>: <span class="s">"jev-latest"</span>,</div>
+      <div>  <span class="k">"state"</span>: {</div>
+      <div>    <span class="k">"claim"</span>: <span class="s">"The cart total is €7.00"</span>,</div>
+      <div>    <span class="k">"accessibility_snapshot"</span>: <span class="s">"- heading \"Your cart\" …"</span></div>
+      <div>  },</div>
+      <div>  <span class="k">"questions"</span>: {</div>
+      <div>    <span class="k">"satisfied"</span>: {</div>
+      <div>      <span class="k">"type"</span>: <span class="s">"noul"</span>,</div>
+      <div>      <span class="k">"instructions"</span>: <span class="s">"Does the snapshot show the claim is true?"</span>,</div>
+      <div>      <span class="k">"criteria"</span>: {</div>
+      <div>        <span class="k">"true"</span>: <span class="s">"The snapshot clearly shows the claim holds"</span>,</div>
+      <div>        <span class="k">"false"</span>: <span class="s">"It contradicts the claim or lacks evidence"</span></div>
+      <div>      }</div>
+      <div>    }</div>
+      <div>  }</div>
+      <div>}</div>
+    </div>
+    <div class="tagline" style="left:880px;top:860px" data-in="19" data-fx="pop"><span class="mono">state</span>: any text or JSON</div>
+    <div class="tagline" style="left:880px;top:920px" data-in="20" data-fx="pop"><span class="mono">questions</span>: keyed by id, many per call</div>
+    <div class="tagline" style="left:880px;top:980px" data-in="21" data-fx="pop"><span class="mono">type</span>: noul · choice · score</div>
+  </section>
+
+  <!-- 4. The three question types and their answers -->
+  <section class="scene" id="s4" data-a="26" data-b="42.4">
+    <div class="head">
+      <div class="kicker" data-in="26.5">Question types</div>
+      <h2 class="h2" data-in="26.7">Three shapes of question. Every answer has a probability.</h2>
+    </div>
+    <div class="card qt" style="left:120px" data-in="27.3">
+      <div class="name mono">noul</div>
+      <div class="ask">Is this proposition true?</div>
+      <div class="sect" data-in="28"><div class="label">criteria</div><div class="code"><span class="k">"true"</span>:  <span class="s">"claim holds"</span>
+<span class="k">"false"</span>: <span class="s">"contradicted or no evidence"</span></div></div>
+      <div class="sect" data-in="29.6"><div class="label">answer</div><div class="code">{ <span class="k">"type"</span>: <span class="s">"noul"</span>, <span class="k">"noul"</span>: <span class="n">0.03</span> }</div></div>
+      <div class="bars" data-in="29.8">
+        <div class="bar-row"><span>true</span><div class="track"><div class="fill" data-p="0.03" data-at="30"></div></div><span class="p num">0.03</span></div>
+      </div>
+      <div class="means" data-in="30.8">The probability the claim is true. Here the total is wrong, so <b>the assertion fails: a real bug</b>.</div>
+    </div>
+    <div class="card qt" style="left:690px" data-in="27.6">
+      <div class="name mono">choice</div>
+      <div class="ask">Which one of your options?</div>
+      <div class="sect" data-in="31.8"><div class="label">criteria</div><div class="code"><span class="k">"e12"</span>:  <span class="s">"button Go to checkout"</span>
+<span class="k">"e9"</span>:   <span class="s">"button Apply"</span>
+<span class="k">"none"</span>: <span class="s">"control was removed"</span></div></div>
+      <div class="sect" data-in="33.2"><div class="label">answer</div><div class="code">{ <span class="k">"choice"</span>: <span class="s">"e12"</span>,
+  <span class="k">"probabilities"</span>: { <span class="k">"e12"</span>: <span class="n">0.94</span>, … } }</div></div>
+      <div class="bars" data-in="33.4">
+        <div class="bar-row top"><span>e12</span><div class="track"><div class="fill" data-p="0.94" data-at="33.6"></div></div><span class="p num">0.94</span></div>
+        <div class="bar-row"><span>e9</span><div class="track"><div class="fill" data-p="0.04" data-at="33.6"></div></div><span class="p num">0.04</span></div>
+        <div class="bar-row"><span>none</span><div class="track"><div class="fill" data-p="0.02" data-at="33.6"></div></div><span class="p num">0.02</span></div>
+      </div>
+      <div class="means" data-in="34.4">A distribution over <b>your</b> keys. It can only pick an option you offered, never an invented one.</div>
+    </div>
+    <div class="card qt" style="left:1260px" data-in="27.9">
+      <div class="name mono">score</div>
+      <div class="ask">Where on your ordered scale?</div>
+      <div class="sect" data-in="35.6"><div class="label">criteria (ordered)</div><div class="code">[<span class="s">"Unrelated"</span>, <span class="s">"Possibly related"</span>,
+ <span class="s">"Likely affected"</span>, <span class="s">"Directly affected"</span>]</div></div>
+      <div class="sect" data-in="37"><div class="label">answer</div><div class="code">{ <span class="k">"score"</span>: <span class="n">3</span>, <span class="k">"confidence"</span>: <span class="n">0.80</span> }</div></div>
+      <div class="bars" data-in="37.2">
+        <div class="bar-row"><span>Unrelated</span><div class="track"><div class="fill" data-p="0.02" data-at="37.4"></div></div><span class="p num">0.02</span></div>
+        <div class="bar-row"><span>Possibly</span><div class="track"><div class="fill" data-p="0.05" data-at="37.4"></div></div><span class="p num">0.05</span></div>
+        <div class="bar-row"><span>Likely</span><div class="track"><div class="fill" data-p="0.13" data-at="37.4"></div></div><span class="p num">0.13</span></div>
+        <div class="bar-row top"><span>Directly</span><div class="track"><div class="fill" data-p="0.80" data-at="37.4"></div></div><span class="p num">0.80</span></div>
+      </div>
+      <div class="means" data-in="38.2">A level index plus confidence. Good for ranking: severity, relevance, <b>which specs to run first</b>.</div>
+    </div>
+    <div class="abs note" style="left:120px;top:990px" data-in="39" data-fx="fade">Probabilities in this scene are example values. Confidence is a signal to threshold on, not a guarantee.</div>
+  </section>
+
+  <!-- 5. Output: typed data the code branches on -->
+  <section class="scene" id="s5" data-a="42" data-b="52.4">
+    <div class="head">
+      <div class="kicker" data-in="42.5">Output</div>
+      <h2 class="h2" data-in="42.7">Typed data. Your code sets the threshold.</h2>
+    </div>
+    <div class="card out-code code" data-in="43.2">
+      <div data-in="43.4"><span class="kw">const</span> response = <span class="kw">await</span> provider.<span class="fn">decide</span>({ state, questions })</div>
+      <div data-in="43.8"><span class="kw">const</span> p = <span class="fn">noulAnswer</span>(response, <span class="s">"satisfied"</span>).noul  <span class="c">// 0.03</span></div>
+      <div></div>
+      <div data-in="44.4"><span class="kw">if</span> (p &gt;= config.assertions.threshold) <span class="fn">pass</span>()  <span class="c">// 0.9</span></div>
+      <div data-in="44.8"><span class="kw">else</span> <span class="fn">fail</span>(<span class="s">"Claim not supported by the page"</span>)</div>
+      <div></div>
+      <div data-in="45.4" class="c">// The response shape is validated at runtime before use.</div>
+      <div data-in="45.6" class="c">// A failed call falls back to plain Playwright behaviour.</div>
+    </div>
+    <div class="card thr" data-in="43.8" data-fx="right">
+      <div class="label" style="margin-bottom:10px">Defaults in playwright-jev</div>
+      <div class="row"><span>toSatisfy passes at</span><b>0.90</b></div>
+      <div class="row"><span>Retry transient failure at</span><b>0.80</b></div>
+      <div class="row"><span>Run LLM healer at</span><b>0.70</b></div>
+      <div class="row"><span>Heal a locator at</span><b>0.55</b></div>
+      <div class="note" style="margin-top:16px">All configurable. Tune them on measured behaviour.</div>
+    </div>
+    <div class="gauge" data-in="46.4" data-fx="fade">
+      <div class="track"></div>
+      <div class="mark" style="left:0"><span>0</span></div>
+      <div class="mark" style="left:calc(90% - 2px)"><span>threshold 0.9</span></div>
+      <div class="mark" style="left:calc(100% - 4px)"><span>1</span></div>
+      <div class="dot" id="gauge-dot"></div>
+      <div class="verdict" data-in="48.6" data-fx="fade">p = <b class="num">0.03</b> is below 0.9: <b class="bug-c">assertion fails, cart total bug caught</b></div>
+    </div>
+  </section>
+
+  <!-- 6. playwright-jev -->
+  <section class="scene" id="s6" data-a="52" data-b="62.4">
+    <div class="head">
+      <div class="kicker" data-in="52.5">playwright-jev</div>
+      <h2 class="h2" data-in="52.7">JEV behind Playwright's own extension points.</h2>
+    </div>
+    <div class="ftable">
+      <div class="frow h" data-in="53.2" data-fx="fade"><span>Feature</span><span>Plugs into</span><span>Question</span></div>
+      <div class="frow" data-in="53.5" data-fx="left"><span>Locator healing</span><span class="mono">playwright-jev/test fixture</span><span><span class="qtag">choice</span>live elements</span></div>
+      <div class="frow" data-in="53.8" data-fx="left"><span>Semantic assertions</span><span class="mono">expect(page).toSatisfy()</span><span><span class="qtag">noul</span>claim holds</span></div>
+      <div class="frow" data-in="54.1" data-fx="left"><span>Triage, retries, healer gate</span><span class="mono">playwright-jev/reporter</span><span><span class="qtag">choice</span>root cause</span></div>
+      <div class="frow" data-in="54.4" data-fx="left"><span>Step verification</span><span class="mono">MCP proxy for agents</span><span><span class="qtag">noul</span>step achieved</span></div>
+      <div class="frow" data-in="54.7" data-fx="left"><span>Snapshot pruning</span><span class="mono">MCP proxy for agents</span><span><span class="qtag">score</span>per region</span></div>
+      <div class="frow" data-in="55" data-fx="left"><span>Test impact ordering</span><span class="mono">playwright-jev impact</span><span><span class="qtag">score</span>per spec</span></div>
+    </div>
+    <div class="card fcode code" data-in="56">
+      <div><span class="kw">import</span> { expect, test } <span class="kw">from</span> <span class="s">"playwright-jev/test"</span>  <span class="c">// instead of "@playwright/test"</span></div>
+      <div><span class="kw">await</span> page.<span class="fn">getByRole</span>(<span class="s">"button"</span>, { name: <span class="s">"Checkout"</span> }).<span class="fn">click</span>()  <span class="hl">// renamed? choice picks the new element</span></div>
+      <div><span class="kw">await</span> <span class="fn">expect</span>(page).<span class="fn">toSatisfy</span>(<span class="s">"The payment page asks for a card"</span>)  <span class="hl">// noul</span></div>
+    </div>
+  </section>
+
+  <!-- 7. One question, both engines -->
+  <section class="scene" id="s7" data-a="62" data-b="72.4">
+    <div class="head">
+      <div class="kicker" data-in="62.5">Locator healing, live · real time</div>
+      <h2 class="h2" data-in="62.7">“Checkout” was renamed. Which element is it now?</h2>
+    </div>
+    <div class="card panel l" id="p-llm" data-in="63">
+      <div class="who llm-c">Claude Opus 5.5</div>
+      <div class="sub">chat completion, JSON as text</div>
+      <div class="clock num llm-c" id="c-llm">0.0 s</div>
+      <div class="pcost num" id="pc-llm">cost <b>$0.0000</b></div>
+      <div class="shop" id="shop-llm"></div>
+      <div class="qtext">Generated answer:</div>
+      <div class="stream mono" id="stream-llm"></div>
+    </div>
+    <div class="card panel r" id="p-jev" data-in="63.2">
+      <div class="who jev-c">JEV</div>
+      <div class="sub">one choice decision</div>
+      <div class="clock num jev-c" id="c-jev">0.00 s</div>
+      <div class="pcost num" id="pc-jev">cost <b>$0.000000</b></div>
+      <div class="shop" id="shop-jev"></div>
+      <div class="qtext">Typed answer:</div>
+      <div class="stream mono" id="stream-jev" style="font-size:21px;color:var(--ok)">{ "choice": "e12", "probabilities": { "e12": 0.94 } }</div>
+    </div>
+  </section>
+
+  <!-- 8. Suite race with time and cost -->
+  <section class="scene" id="s8" data-a="72" data-b="84.4">
+    <div class="head">
+      <div class="kicker" data-in="72.5">Whole demo suite · 10 tests · 12 questions · played 8× faster</div>
+      <h2 class="h2" data-in="72.7">Release 2 renamed 4 controls and broke the cart total.</h2>
+    </div>
+    <div class="card lane llm" data-in="73" data-fx="left" style="top:240px">
+      <div class="who llm-c">Playwright + Claude Opus 5.5</div>
+      <div class="stats num"><span>questions <b id="rq-llm">0/12</b></span><span>waiting on AI <b id="rw-llm">0.0 s</b></span><span>AI cost <b id="rc-llm">$0.0000</b></span></div>
+      <div class="clock num llm-c" id="lc-llm">0.0 s</div>
+      <div class="track"><div class="work" id="lw-llm"></div><div class="wait" id="lx-llm"></div></div>
+      <div class="tests" id="lt-llm"></div>
+    </div>
+    <div class="card lane jev" data-in="73.2" data-fx="left" style="top:600px;border-color:var(--jev)">
+      <div class="who jev-c">Playwright + JEV</div>
+      <div class="stats num"><span>questions <b id="rq-jev">0/12</b></span><span>waiting on AI <b id="rw-jev">0.0 s</b></span><span>AI cost <b id="rc-jev">$0.0000</b></span></div>
+      <div class="clock num jev-c" id="lc-jev">0.0 s</div>
+      <div class="track"><div class="work" id="lw-jev"></div><div class="wait" id="lx-jev"></div></div>
+      <div class="done" id="done-jev">Done</div>
+      <div class="tests" id="lt-jev"></div>
+    </div>
+    <div class="legend" data-in="73.4" data-fx="fade">
+      <span><i style="background:var(--ok)"></i>Test steps</span>
+      <span><i style="background:repeating-linear-gradient(-45deg,var(--muted) 0 5px,var(--dim) 5px 10px)"></i>Waiting for AI answers</span>
+      <span><i style="background:var(--jev)"></i>Healed renamed control</span>
+      <span><i style="background:var(--bug)"></i>Real bug caught</span>
+    </div>
+  </section>
+
+  <!-- 9. Results -->
+  <section class="scene" id="s9" data-a="84" data-b="96.4">
+    <div class="head">
+      <div class="kicker" data-in="84.5">Results · two recorded runs · live APIs · no caching</div>
+      <h2 class="h2" data-in="84.7"><span class="jev-c">4.8× faster</span> and <span class="ok-c">177× cheaper</span>. Same outcomes.</h2>
+    </div>
+    <div class="rtable">
+      <div class="rrow h" data-in="85.2" data-fx="fade"><span></span><span class="llm-c">Claude Opus 5.5</span><span class="jev-c">JEV</span><span>Ratio</span></div>
+      <div class="rrow key" data-in="85.5" data-fx="left"><span>Total run time</span><span>69.3 s</span><span>14.4 s</span><span class="x">4.8×</span></div>
+      <div class="rrow" data-in="85.8" data-fx="left"><span>Test steps</span><span>10.2 s</span><span>10.2 s</span><span>same</span></div>
+      <div class="rrow" data-in="86.1" data-fx="left"><span>Waiting on AI</span><span>59.1 s</span><span>4.2 s</span><span class="x">14×</span></div>
+      <div class="rrow" data-in="86.4" data-fx="left"><span>Per question</span><span>4.93 s</span><span>0.35 s</span><span class="x">14×</span></div>
+      <div class="rrow key" data-in="86.7" data-fx="left"><span>AI cost per run</span><span>$0.053</span><span>$0.0003</span><span class="x">177×</span></div>
+      <div class="rrow" data-in="87" data-fx="left"><span>Tests passed, incl. 4 healed</span><span>9 of 10</span><span>9 of 10</span><span>same</span></div>
+      <div class="rrow" data-in="87.3" data-fx="left"><span>Real bugs caught</span><span>1</span><span>1</span><span>same</span></div>
+    </div>
+    <div class="card triage" data-in="88.4">
+      <div class="label">Triage of the failed cart test, from each lane's .playwright-jev/triage.md</div>
+      <div class="code"><span class="llm-c">Opus 5.5</span>  app_bug  72%  review   Decision cost: $0.012488 (2262 input tokens)
+<span class="jev-c">JEV     </span>  app_bug  89%  review   Decision cost: $0.000073 (1749 input tokens)</div>
+    </div>
+    <div class="abs note" style="left:120px;top:990px;width:1680px" data-in="89.6" data-fx="fade">The speedup is in the AI questions, not Playwright itself. A suite that asks no questions gains nothing; one that asks more gains more.</div>
+  </section>
+
+  <!-- 10. End -->
+  <section class="scene" id="s10" data-a="96" data-b="104.4">
+    <div class="abs" style="left:0;right:0;top:250px;text-align:center">
+      <div class="end-title" data-in="96.4" data-fx="pop">playwright<span class="jev-c">-jev</span></div>
+      <div class="lede" data-in="96.8" style="margin-top:14px;font-size:34px">Typed <span class="mono jev-c">noul</span> / <span class="mono jev-c">choice</span> / <span class="mono jev-c">score</span> decisions for Playwright, answered by JEV.</div>
+      <div style="margin-top:50px" data-in="97.2"><span class="install mono">npm install -D playwright-jev</span></div>
+      <div class="note" style="margin-top:50px;font-size:24px" data-in="97.6">Guide: docs/guide.md · Demo and measurements: demo/README.md · Off switch: PLAYWRIGHT_JEV_DISABLED=1</div>
+    </div>
+  </section>
+
+  <div class="progress" id="progress"></div>
+</div>
+
+<script>
+  const DURATION = 103.4
+  const $ = (id) => document.getElementById(id)
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x))
+  const prog = (t, a, b) => clamp((t - a) / (b - a))
+  const easeOut = (x) => 1 - (1 - x) ** 3
+  const easeInOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2)
+  const back = (x) => 1 + 2.70158 * (x - 1) ** 3 + 1.70158 * (x - 1) ** 2
+  const lerp = (a, b, k) => a + (b - a) * k
+
+  function enter(el, k, { dy = 0, dx = 0, s = 1 } = {}) {
+    el.style.opacity = k
+    el.style.transform = `translate(${dx * (1 - k)}px, ${dy * (1 - k)}px) scale(${lerp(s, 1, k)})`
+  }
+  const effects = {
+    up: (k) => [easeOut(k), { dy: 30 }],
+    left: (k) => [easeOut(k), { dx: -50 }],
+    right: (k) => [easeOut(k), { dx: 50 }],
+    pop: (k) => [back(k), { s: 0.85 }],
+    fade: (k) => [easeOut(k), {}],
+  }
+  const reveals = [...document.querySelectorAll("[data-in]")].map((el) => ({
+    el,
+    at: Number(el.dataset.in),
+    fx: effects[el.dataset.fx ?? "up"],
+  }))
+  const scenes = [...document.querySelectorAll(".scene")].map((el) => ({
+    el,
+    a: Number(el.dataset.a),
+    b: Number(el.dataset.b),
+  }))
+  const fills = [...document.querySelectorAll(".fill[data-at]")]
+
+  // Measured on the demo suite: averages over 12 questions and two recorded runs.
+  const LLM_S = 4.9
+  const LLM_FIRST = 2.6
+  const JEV_S = 0.35
+  const LLM_COST = 0.053 / 12
+  const JEV_COST = 0.0003 / 12
+
+  // The JSON an LLM writes for one choice question, split roughly the way a tokenizer would.
+  const llmTokens = ['{"', "answers", '":', ' {"', "q", "1", '":', ' {"', "answer", '":', ' "', "e", "12", '",', ' "', "confidence", '":', " 0", ".", "93", "}}}"]
+  const tokenHtml = llmTokens.map((tok) => `<span class="tok">${tok.replace(/ /g, "&nbsp;")}</span>`).join("")
+  $("ar-tokens").innerHTML = tokenHtml
+  $("stream-llm").innerHTML = tokenHtml
+  const arToks = [...$("ar-tokens").children]
+  const s7Toks = [...$("stream-llm").children]
+
+  // Scene 7: small copies of the demo shop's cart page.
+  const shopHtml = `<div class="bar"><span>Home</span><span>Search</span><span>Cart (1)</span></div>
+    <h4>Your cart</h4><p>Apple × 1: €2.50</p>
+    <div class="row">Promo code <span class="input"></span> <span class="btn">Apply</span></div>
+    <div class="row"><span class="btn" data-target>Go to checkout</span></div>`
+  for (const lane of ["llm", "jev"]) {
+    $(`shop-${lane}`).innerHTML = `${shopHtml}<div class="pick" id="pick-${lane}" style="opacity:0"><span></span></div>`
+  }
+
+  // Scene 8: the recorded lanes. Tests and questions finish evenly over each run.
+  const race = {
+    llm: { total: 69.3, work: 10.2, cost: 0.053 },
+    jev: { total: 14.4, work: 10.2, cost: 0.0003 },
+  }
+  const testNames = ["Home", "Cart link", "Price", "Add to cart", "Items", "Cart total", "Coupon", "Checkout", "Search", "Contact"]
+  const tagOf = { 3: "heal", 5: "bug", 6: "heal", 7: "heal", 9: "heal" }
+  for (const lane of ["llm", "jev"]) {
+    $(`lt-${lane}`).innerHTML = testNames.map((name) => `<div class="t">${name}</div>`).join("")
+  }
+  const RACE_START = 74
+  // Moments the picture and the sound track share.
+  const AR_START = 2.4 // the LLM starts writing tokens
+  const AR_SECONDS = 9
+  const NAR_FIRE = 3 // JEV answers in one pass
+  const GAUGE_LAND = 48.2 // the noul answer lands below the threshold
+  const HEAL_START = 64.2 // both engines get the healing question
+  const SPEED = 8
+  const RACE_SCALE = 72 // seconds of race that fill the track
+  const TRACK_W = 1680 - 72
+
+  function render(t) {
+    // Background drifts slowly and leans towards JEV's colour as the story moves on.
+    const drift = t / DURATION
+    Object.assign($("glow-a").style, { left: `${1100 + Math.sin(t * 0.3) * 180 - drift * 300}px`, top: `${-250 + Math.cos(t * 0.25) * 120}px`, opacity: 0.3 + drift * 0.2 })
+    Object.assign($("glow-b").style, { left: `${-250 + Math.cos(t * 0.2) * 150}px`, top: `${550 + Math.sin(t * 0.33) * 120}px`, opacity: 0.32 - drift * 0.22 })
+    $("progress").style.width = `${(t / DURATION) * 100}%`
+
+    // The outgoing scene clears in the overlap before the incoming one fades in, so text never stacks.
+    for (const { el, a, b } of scenes) {
+      const kIn = a === 0 ? 1 : easeOut(prog(t, a + 0.4, a + 0.75))
+      const kOut = 1 - easeInOut(prog(t, b - 0.4, b))
+      const k = Math.min(kIn, kOut)
+      el.style.opacity = k
+      el.style.transform = `translateY(${(1 - kOut) * -30}px)`
+      el.style.visibility = k > 0 ? "visible" : "hidden"
+    }
+    for (const { el, at, fx } of reveals) {
+      const [k, motion] = fx(prog(t, at, at + 0.55))
+      enter(el, k, motion)
+    }
+    for (const fill of fills) {
+      const at = Number(fill.dataset.at)
+      fill.style.width = `${Number(fill.dataset.p) * 100 * easeOut(prog(t, at, at + 0.9))}%`
+    }
+
+    // 2. The LLM loops once per token; JEV fires once.
+    const s2 = t - AR_START
+    const arDone = Math.floor(clamp(s2 / AR_SECONDS) * arToks.length)
+    arToks.forEach((tok, i) => {
+      enter(tok, i < arDone ? 1 : 0, { dy: 10 })
+    })
+    $("ar-count").textContent = arDone
+    $("ar-loop").style.transform = `rotate(${s2 > 0 && arDone < arToks.length ? t * 400 : 0}deg)`
+    $("ar-model").style.transform = `scale(${s2 > 0 && arDone < arToks.length ? 1 + 0.06 * Math.sin(t * 14) : 1})`
+    const fire = prog(t, NAR_FIRE - 0.2, NAR_FIRE + 0.2)
+    $("nar-model").style.transform = `scale(${1 + 0.2 * Math.sin(Math.PI * fire)})`
+    $("nar-model").style.boxShadow = `0 0 ${20 + 100 * Math.sin(Math.PI * fire)}px #7d6bff`
+    $("nar-count").textContent = t >= NAR_FIRE ? 1 : 0
+    ;[1, 2, 3].forEach((n) => {
+      enter($(`nar-${n}`), back(prog(t, 3.1, 3.6)), { dx: -40 })
+    })
+    // Measured per decision on the demo suite; each lane shows its figure once its answer is complete.
+    enter($("price-jev"), back(prog(t, 3.5, 4.0)), { s: 0.8 })
+    enter($("price-llm"), back(prog(t, 11.4, 11.9)), { s: 0.8 })
+
+    // 3. The request builds up line by line.
+    ;[...$("s3-req").children].forEach((line, i) => {
+      enter(line, easeOut(prog(t, 14.6 + i * 0.2, 15 + i * 0.2)), { dx: 20 })
+    })
+    $("s3-req").style.opacity = easeOut(prog(t, 14.4, 14.8))
+
+    // 5. The answer lands on the threshold gauge.
+    $("gauge-dot").style.left = `${lerp(50, 3, easeInOut(prog(t, GAUGE_LAND - 1.2, GAUGE_LAND)))}%`
+
+    // 7. One healing question, both engines in real time.
+    const s7 = t - HEAL_START
+    for (const [lane, total, cost, digits] of [["llm", LLM_S, LLM_COST, 4], ["jev", JEV_S, JEV_COST, 6]]) {
+      const elapsed = clamp(s7, 0, total)
+      const done = s7 >= total
+      $(`c-${lane}`).textContent = `${elapsed.toFixed(lane === "jev" ? 2 : 1)} s`
+      $(`pc-${lane}`).innerHTML = `cost <b>$${(done ? cost : 0).toFixed(digits)}</b>`
+      const pick = $(`pick-${lane}`)
+      const target = $(`shop-${lane}`).querySelector("[data-target]")
+      Object.assign(pick.style, { left: `${target.offsetLeft - 8}px`, top: `${target.offsetTop - 8}px`, width: `${target.offsetWidth + 16}px`, height: `${target.offsetHeight + 16}px` })
+      pick.style.opacity = done ? 1 : 0
+      pick.style.transform = `scale(${lerp(1.6, 1, done ? back(prog(s7, total, total + 0.4)) : 0)})`
+      pick.querySelector("span").textContent = `picked in ${total} s`
+      $(`p-${lane}`).style.borderColor = !done && s7 > 0 ? `var(--${lane})` : "var(--rule)"
+    }
+    const w7 = Math.floor(clamp((s7 - LLM_FIRST) / (LLM_S - LLM_FIRST)) * s7Toks.length)
+    s7Toks.forEach((tok, i) => {
+      tok.style.opacity = i < w7 ? 1 : 0
+    })
+    enter($("stream-jev"), easeOut(prog(s7, JEV_S, JEV_S + 0.4)), { dy: 12 })
+
+    // 8. The whole suite, with time and cost adding up.
+    const raceT = Math.max(0, (t - RACE_START) * SPEED)
+    for (const lane of ["llm", "jev"]) {
+      const { total, work, cost } = race[lane]
+      const elapsed = Math.min(raceT, total)
+      const share = elapsed / total
+      const workPart = elapsed * (work / total)
+      $(`lc-${lane}`).textContent = `${elapsed.toFixed(1)} s`
+      $(`rq-${lane}`).textContent = `${Math.floor(share * 12)}/12`
+      $(`rw-${lane}`).textContent = `${(elapsed - workPart).toFixed(1)} s`
+      $(`rc-${lane}`).textContent = `$${(cost * share).toFixed(4)}`
+      $(`lw-${lane}`).style.width = `${(workPart / RACE_SCALE) * TRACK_W}px`
+      Object.assign($(`lx-${lane}`).style, { left: `${(workPart / RACE_SCALE) * TRACK_W}px`, width: `${((elapsed - workPart) / RACE_SCALE) * TRACK_W}px` })
+      ;[...$(`lt-${lane}`).children].forEach((el, i) => {
+        const finished = elapsed >= ((i + 1) / testNames.length) * total - 0.01
+        el.className = `t${finished ? ` ${tagOf[i] ?? "pass"}` : ""}`
+      })
+    }
+    const jevDone = RACE_START + race.jev.total / SPEED
+    enter($("done-jev"), back(prog(t, jevDone, jevDone + 0.4)), { s: 0.4 })
+    $("done-jev").style.left = `${36 + (race.jev.total / RACE_SCALE) * TRACK_W + 20}px`
+  }
+
+  // Scale the 1920×1080 stage to the window for live preview.
+  function fitStage() {
+    const s = Math.min(innerWidth / 1920, innerHeight / 1080)
+    $("stage").style.transform = `translate(${(innerWidth - 1920 * s) / 2}px, ${(innerHeight - 1080 * s) / 2}px) scale(${s})`
+  }
+  addEventListener("resize", fitStage)
+  fitStage()
+
+  // Sound cues for render.mjs, derived from the same timeline as the picture. Sparse on purpose: one sound per
+  // meaningful event, quiet ticks only where the LLM is visibly writing tokens.
+  window.soundCues = [
+    ...scenes.filter(({ a }) => a > 0).map(({ a }) => ({ at: a + 0.35, sound: "whoosh" })),
+    ...arToks.map((_, i) => ({ at: AR_START + ((i + 1) / arToks.length) * AR_SECONDS, sound: "tick" })),
+    { at: NAR_FIRE, sound: "chime" },
+    { at: AR_START + AR_SECONDS, sound: "thud" },
+    { at: GAUGE_LAND, sound: "bug" },
+    { at: HEAL_START + JEV_S, sound: "chime" },
+    { at: HEAL_START + LLM_S, sound: "thud" },
+    { at: RACE_START + race.jev.total / SPEED, sound: "chime" },
+    { at: RACE_START + race.llm.total / SPEED, sound: "thud" },
+    { at: 84.7, sound: "resolve" },
+    { at: 96.4, sound: "resolve" },
+  ]
+
+  // The renderer calls seek(t) per frame. Without it, play in real time.
+  window.DURATION = DURATION
+  window.seek = (t) => {
+    window.playing = false
+    render(t)
+  }
+  window.playing = true
+  const offset = Number(/t=([\d.]+)/.exec(location.hash)?.[1] ?? 0)
+  let startedAt = performance.now() - offset * 1000
+  addEventListener("click", () => {
+    startedAt = performance.now()
+  })
+  function tick(now) {
+    if (!window.playing) return
+    render(Math.min((now - startedAt) / 1000, DURATION))
+    requestAnimationFrame(tick)
+  }
+  document.fonts.ready.then(() => {
+    window.explainerReady = true
+    requestAnimationFrame(tick)
+  })
+</script>
+</body>
+</html>

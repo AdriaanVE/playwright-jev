@@ -1,9 +1,18 @@
 {
   "name": "playwright-jev",
-  "version": "0.4.1",
+  "version": "0.1.0",
   "description": "Structured JEV decisions for Playwright: failure triage, smart retries, healer gating, snapshot pruning, locator healing, semantic assertions, and test impact ordering.",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "MIT",
+  "author": "Adriaan Van Erps",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AdriaanVE/playwright-jev.git"
+  },
+  "homepage": "https://github.com/AdriaanVE/playwright-jev#readme",
+  "bugs": {
+    "url": "https://github.com/AdriaanVE/playwright-jev/issues"
+  },
   "private": true,
   "engines": {
     "node": ">=22"
@@ -33,13 +42,15 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
     "lint": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:e2e": "npm run build && playwright test -c e2e/playwright.config.ts && node e2e/mcp-proxy.check.mjs",
     "format": "biome check --write .",
     "check": "biome ci . && tsc -p tsconfig.json",
     "demo": "npm run build && node demo/race.mjs",
-    "demo:record": "npm run build && node demo/race.mjs --record"
+    "demo:record": "npm run build && node demo/race.mjs --record",
+    "demo:explainer": "node demo/explainer/render.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1"
